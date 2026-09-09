@@ -2,15 +2,17 @@
 # archivo al desplegar, de modo que se limita a lo que la aplicacion necesita
 # para ejecutarse.
 #
-# Las versiones estan fijadas de forma deliberada: el modelo se serializo con
-# scikit-learn 1.7.2 y cargarlo con una version distinta puede producir avisos
-# de incompatibilidad o fallar.
+# scikit-learn se mantiene en la version con la que se serializo el modelo, para
+# garantizar que se cargue sin advertencias de compatibilidad. numpy se deja como
+# rango porque el entorno de despliegue usa una version reciente de Python que no
+# dispone de paquete precompilado para versiones antiguas de numpy; fijarla
+# provocaba que la instalacion de dependencias fallara por completo.
 #
 # Para ejecutar el flujo analitico completo, ver requirements-pipeline.txt
 
-streamlit==1.45.1
-pandas==2.3.3
-numpy==2.0.2
+streamlit>=1.40,<2
+pandas>=2.2,<3
+numpy>=2.1,<3
 scikit-learn==1.7.2
-joblib==1.5.3
-plotly==6.7.0
+joblib>=1.4
+plotly>=6.0,<7
