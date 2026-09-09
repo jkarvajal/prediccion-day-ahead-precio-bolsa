@@ -1,0 +1,81 @@
+Correr en maquina sin admin
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+1. Comando para crear el entorno virtual en la terminal de VSC
+python -m venv .venv
+
+2. Activar el entorno
+.venv\Scripts\Activate.ps1
+
+3.
+Actualiar el pip
+python -m pip install --upgrade pip
+
+4.
+Instalar librerias configuradas en requirements.tx
+pip install -r requirements.txt
+
+3. Conectar el entorno con VS Code
+
+En VS Code:
+presiona Ctrl + Shift + P
+escribe: Python: Select Interpreter
+
+selecciona el que apunte a:
+.venv\Scripts\python.exe
+
+Eso hace que:
+
+tus notebooks usen ese entorno
+tus scripts .py también
+las instalaciones queden dentro del proyecto
+
+8. Registrar el kernel para notebooks
+
+Como vas a trabajar con .ipynb, instala ipykernel dentro del entorno:
+pip install ipykernel
+
+Luego registra el kernel:
+python -m ipykernel install --user --name proyecto_precio_bolsa --display-name "Python (.venv) - Proyecto Precio Bolsa"
+
+
+
+
+#----------------------------------------------------------------------------------
+Iniciar de nuevo el entorno
+
+----------Desactivarlo---------------
+deactivate
+
+-----------Iniciar activarlo------------------------
+1. Abre de nuevo tu proyecto en VS Code
+Abre la carpeta raíz: proyecto_precio_bolsa
+
+2. Abre una terminal nueva
+En VS Code: Terminal > New Terminal
+
+3. Verifica que estés en la raíz del proyecto
+En la terminal deberías ver algo parecido a: PS F:\...\proyecto_precio_bolsa>
+Si no estás ahí, entra con: cd "F:\OneDrive\OneDrive - CELSIA S.A E.S.P\Proyectos\Python\proyecto_precio_bolsa"
+
+4. Activa otra vez el entorno
+Como estás en PowerShell, usa: .venv\Scripts\Activate.ps1
+
+5. Si da error de permisos
+
+Ejecuta esto una sola vez: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Acepta con Y, cierra la terminal y vuelve a correr: .venv\Scripts\Activate.ps1
+
+6. Verifica que quedó bien
+
+Ejecuta: Get-Command python
+
+o: where.exe python
+
+where.exe python
+...\proyecto_precio_bolsa\.venv\Scripts\python.exe
+
+7. Si el notebook no toma el entorno
+
+Abre el .ipynb y mira arriba a la derecha. Debe aparecer algo como:
+.venv (Python 3.12.4)

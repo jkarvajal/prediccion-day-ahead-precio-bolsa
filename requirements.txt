@@ -1,0 +1,13 @@
+pandas
+numpy
+matplotlib
+plotly
+scikit-learn
+statsmodels
+joblib
+streamlit
+jupyter
+ipykernel
+holidays
+openpyxl
+requests

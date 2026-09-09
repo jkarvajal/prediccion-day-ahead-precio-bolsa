@@ -1,0 +1,40 @@
+{
+  "modelo": "Lasso_horario_con_exogenas",
+  "descripcion": "24 modelos Lasso independientes (uno por hora), seleccionado en NB07",
+  "fecha_entrenamiento": "2026-07-01T23:34:01.653759",
+  "datos_hasta": "2026-03-27",
+  "n_observaciones": 5930,
+  "metricas_test_nb07": {
+    "MAE": 77.2,
+    "RMSE": 154.71,
+    "sMAPE": 18.91,
+    "R2": 0.8349,
+    "nota": "Evaluado en NB07 con particion temporal 80/20 (test: 2022-12 a 2026-03)"
+  },
+  "n_features_por_hora": {
+    "0": 89,
+    "1": 89,
+    "2": 89,
+    "3": 89,
+    "4": 89,
+    "5": 89,
+    "6": 89,
+    "7": 89,
+    "8": 89,
+    "9": 89,
+    "10": 89,
+    "11": 89,
+    "12": 89,
+    "13": 89,
+    "14": 89,
+    "15": 89,
+    "16": 89,
+    "17": 89,
+    "18": 89,
+    "19": 89,
+    "20": 89,
+    "21": 89,
+    "22": 89,
+    "23": 89
+  }
+}

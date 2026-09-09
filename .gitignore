@@ -1,0 +1,38 @@
+# Entornos virtuales y cache de Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Datos crudos e intermedios: se regeneran ejecutando el flujo y pesan cientos de
+# megabytes, de modo que no forman parte del repositorio.
+data/raw/
+data/processed/*
+data/outputs/*
+
+# Excepciones: artefactos que la aplicacion web consume en linea. Se usa la forma
+# "carpeta/*" en las reglas anteriores porque una carpeta excluida por completo
+# impediria volver a incluir archivos de su interior.
+!data/processed/features_day_ahead.csv
+!data/outputs/hourly_dayahead_metrics_by_hour.csv
+!data/outputs/baseline_global_results.csv
+
+# Cuadernos de trabajo: contienen graficas incrustadas que elevan mucho el peso
+# del repositorio y no son necesarios para el despliegue.
+notebooks/
+
+# Documentos academicos y material del curso. Se mantienen fuera del repositorio
+# publico por dos razones: publicar los entregables antes de su calificacion
+# puede generar coincidencias de similitud contra el propio autor, y las guias
+# de actividades son material institucional de la universidad.
+reports/
+guias/
+
+# Scripts de redaccion del documento: contienen el texto integro de los
+# capitulos, de modo que se excluyen por la misma razon que los entregables.
+src/contenido_fase2.py
+src/construir_fase2.py
+
+# Configuracion local de herramientas
+.claude/
