@@ -1,0 +1,20 @@
+# Dependencias del flujo analitico completo: procesamiento, analisis
+# exploratorio, ingenieria de variables, entrenamiento y comparacion de
+# estrategias. No se requieren para ejecutar la aplicacion web.
+
+-r requirements.txt
+
+matplotlib
+statsmodels
+holidays
+openpyxl
+requests
+python-docx
+
+# Modelos especializados usados en la comparacion consolidada
+prophet
+tensorflow
+
+# Entorno de cuadernos
+jupyter
+ipykernel

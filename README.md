@@ -19,6 +19,10 @@ pip install -r requirements.txt
 streamlit run app/app.py
 ```
 
+Para ejecutar el flujo analítico completo, y no solo la aplicación, se instala
+`requirements-pipeline.txt`, que añade las dependencias de procesamiento,
+modelado y cuadernos.
+
 ## Resultados principales
 
 Todas las estrategias se evaluaron bajo un protocolo único: partición temporal

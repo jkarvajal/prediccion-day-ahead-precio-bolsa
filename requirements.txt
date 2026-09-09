@@ -1,13 +1,16 @@
-pandas
-numpy
-matplotlib
-plotly
-scikit-learn
-statsmodels
-joblib
-streamlit
-jupyter
-ipykernel
-holidays
-openpyxl
-requests
+# Dependencias de la aplicacion web. Streamlit Community Cloud instala este
+# archivo al desplegar, de modo que se limita a lo que la aplicacion necesita
+# para ejecutarse.
+#
+# Las versiones estan fijadas de forma deliberada: el modelo se serializo con
+# scikit-learn 1.7.2 y cargarlo con una version distinta puede producir avisos
+# de incompatibilidad o fallar.
+#
+# Para ejecutar el flujo analitico completo, ver requirements-pipeline.txt
+
+streamlit==1.45.1
+pandas==2.3.3
+numpy==2.0.2
+scikit-learn==1.7.2
+joblib==1.5.3
+plotly==6.7.0
