@@ -28,6 +28,7 @@ notebooks/
 # de actividades son material institucional de la universidad.
 reports/
 guias/
+reuniones/
 
 # Scripts de redaccion del documento: contienen el texto integro de los
 # capitulos, de modo que se excluyen por la misma razon que los entregables.

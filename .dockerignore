@@ -1,0 +1,14 @@
+# El contenedor solo necesita la aplicacion y sus artefactos. Todo lo demas se
+# excluye para mantener la imagen liviana y el build rapido.
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+notebooks/
+reports/
+guias/
+reuniones/
+data/raw/
+requirements-pipeline.txt

@@ -1,3 +1,13 @@
+---
+title: Prediccion Precio Bolsa Colombia
+emoji: ⚡
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8501
+pinned: false
+---
+
 # Predicción day-ahead del precio de bolsa de energía
 
 Proyecto aplicado de la Maestría en Ciencia de Datos y Analítica (UNAD). Implementa
