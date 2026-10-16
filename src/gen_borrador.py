@@ -1090,7 +1090,7 @@ CAP2_EXOGENAS = [
     "de ciento ochenta días. En otras palabras, la señal climática anticipa en varios "
     "meses la evolución del recurso hídrico, que a su vez condiciona el precio. Esto "
     "justifica incorporar el ONI y el nivel de embalses, con sus rezagos, como "
-    "predictores de mediano plazo.",
+    "predictores de mediano plazo. La Tabla 5 resume estas relaciones.",
 ]
 
 CAP2_EXOGENAS_TABLA = [
@@ -1300,7 +1300,8 @@ def capitulo3(doc):
         parrafo(doc, parr)
     tabla_n(doc, CAP3_RESULTADOS_TABLA,
             ["Estrategia", "MAE", "RMSE", "R²"],
-            "Desempeño de las estrategias sobre el conjunto de prueba")
+            "Desempeño de las estrategias sobre el conjunto de prueba (MAE y RMSE en "
+            "COP/kWh)")
     figura(doc, "cap3_comparacion_estrategias.png",
            "Compromiso entre MAE y RMSE de las estrategias",
            nota="Se excluye Prophet por quedar fuera de rango. La persistencia logra el "
