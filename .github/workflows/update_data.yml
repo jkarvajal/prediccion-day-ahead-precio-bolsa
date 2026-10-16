@@ -4,7 +4,7 @@ on:
   schedule:
     # 10:00 UTC = 05:00 hora Colombia (UTC-5), cuando los datos de XM del dia
     # anterior ya estan publicados y disponibles en la API.
-    - cron: '0 10 * * *'
+    - cron: '0 13 * * *'
   workflow_dispatch:
     # Permite lanzar el pipeline manualmente desde la pestana Actions de GitHub.
 
