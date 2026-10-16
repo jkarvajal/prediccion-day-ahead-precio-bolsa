@@ -35,10 +35,15 @@ PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 OUTPUTS_DIR = PROJECT_ROOT / "data" / "outputs"
 
 MODEL_PATH = MODELS_DIR / "modelo_final_dayahead.joblib"
+MODEL_RESIDUAL_PATH = MODELS_DIR / "modelo_residual_dayahead.joblib"
 METADATA_PATH = MODELS_DIR / "modelo_final_metadata.json"
 FEATURES_PATH = PROCESSED_DIR / "features_day_ahead.csv"
 METRICS_BY_HOUR_PATH = OUTPUTS_DIR / "hourly_dayahead_metrics_by_hour.csv"
 BASELINE_RESULTS_PATH = OUTPUTS_DIR / "baseline_global_results.csv"
+BASELINE_HOURLY_PATH = OUTPUTS_DIR / "baseline_hourly_results.csv"
+REGIMEN_PATH = OUTPUTS_DIR / "consolidado_por_regimen.csv"
+INTERVALOS_PATH = OUTPUTS_DIR / "intervalos_conformales.csv"
+PREDICCION_AUTO_PATH = OUTPUTS_DIR / "prediccion_automatica.csv"
 
 PEAK_HOURS = [18, 19, 20, 21, 22]
 TARGET_COLS = [f"target_h{h:02d}" for h in range(24)]
@@ -82,6 +87,11 @@ st.set_page_config(
 @st.cache_resource
 def load_model():
     return joblib.load(MODEL_PATH)
+
+
+@st.cache_resource
+def load_model_residual():
+    return joblib.load(MODEL_RESIDUAL_PATH) if MODEL_RESIDUAL_PATH.exists() else None
 
 
 @st.cache_data
@@ -150,6 +160,67 @@ def load_persistencia_metrics():
     return {"MAE": 68.95, "RMSE": 157.89, "R2": 0.828}
 
 
+@st.cache_data
+def load_error_por_hora():
+    """MAE por hora del día: Lasso con exógenas frente a la persistencia diaria."""
+    if not (METRICS_BY_HOUR_PATH.exists() and BASELINE_HOURLY_PATH.exists()):
+        return pd.DataFrame()
+    ml = pd.read_csv(METRICS_BY_HOUR_PATH)
+    ml = ml.loc[ml["modelo"] == ML_MODEL_LABEL, ["hora", "MAE"]].copy()
+    ml["Modelo"] = "Lasso"
+    bl = pd.read_csv(BASELINE_HOURLY_PATH)
+    bl = bl.loc[bl["modelo"] == "Baseline_hoy", ["hora", "MAE"]].copy()
+    bl["Modelo"] = "Persistencia"
+    return pd.concat([ml, bl], ignore_index=True).sort_values(["hora", "Modelo"])
+
+
+@st.cache_data
+def load_intervalos():
+    """Intervalos conformales por hora (q_low, q_high) para Lasso y Persistencia."""
+    if not INTERVALOS_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_csv(INTERVALOS_PATH)
+
+
+@st.cache_data(ttl=3600)
+def load_prediccion_auto():
+    """
+    Carga la prediccion automatica generada por el pipeline diario.
+    Retorna None si el archivo no existe o la prediccion tiene mas de 2 dias
+    de antiguedad (posible fallo del pipeline).
+    """
+    if not PREDICCION_AUTO_PATH.exists():
+        return None
+    df = pd.read_csv(PREDICCION_AUTO_PATH)
+    if df.empty or "fecha_objetivo" not in df.columns:
+        return None
+    fecha_obj = pd.to_datetime(df["fecha_objetivo"].iloc[0]).date()
+    from datetime import date as _date  # noqa: PLC0415
+    # Mostrar si la prediccion tiene como maximo 5 dias de diferencia con hoy
+    # (el pipeline de XM tiene un rezago de hasta 3 dias en la disponibilidad de datos)
+    if abs((fecha_obj - _date.today()).days) > 5:
+        return None
+    return df
+
+
+@st.cache_data
+def load_regimen():
+    """Error (MAE) por estrategia según el régimen del precio (calmo / volátil)."""
+    if not REGIMEN_PATH.exists():
+        return pd.DataFrame()
+    d = pd.read_csv(REGIMEN_PATH)
+    d["Régimen"] = d["regimen"].map(
+        {"calmo (<300)": "Precio calmo<br>(< 300 $/kWh)",
+         "volatil (>=300)": "Precio volátil<br>(≥ 300 $/kWh)"}
+    ).fillna(d["regimen"])
+    d["Modelo"] = d["estrategia"].map(
+        {"Persistencia diaria": "Persistencia (referencia)",
+         "Lasso horario": "Lasso",
+         "Aprendizaje residual": "Aprendizaje residual"}
+    ).fillna(d["estrategia"])
+    return d
+
+
 def predict_ml(models, row):
     """Predicción del modelo Lasso para las 24 horas de un día base."""
     preds = []
@@ -158,6 +229,18 @@ def predict_ml(models, row):
         features = [f for f in m["features"] if f in row.index]
         X = row[features].to_frame().T
         preds.append(float(m["pipeline"].predict(X)[0]))
+    return preds
+
+
+def predict_residual(models_res, row):
+    """Aprendizaje residual: persistencia (precio del día base) + residuo estimado."""
+    preds = []
+    for h in range(24):
+        m = models_res[h]
+        features = [f for f in m["features"] if f in row.index]
+        X = row[features].to_frame().T
+        resid = float(m["pipeline"].predict(X)[0])
+        preds.append(float(row[f"h{h:02d}"]) + resid)
     return preds
 
 
@@ -174,6 +257,7 @@ if not MODEL_PATH.exists():
     st.stop()
 
 models = load_model()
+models_res = load_model_residual()
 metadata = load_metadata()
 df = load_features()
 historico = serie_historica(df)
@@ -280,9 +364,9 @@ if oscuro:
 # --- Encabezado ---
 st.title("Precio de bolsa de energía: histórico, predicción y exploración")
 st.markdown(
-    "Mercado eléctrico colombiano (SIN). Elige una pestaña: el **histórico** del "
-    "precio, la **predicción** del día siguiente, la **exploración** de patrones o la "
-    "relación con el **clima**."
+    "Mercado eléctrico colombiano (SIN). Las pestañas siguen el orden del análisis: el "
+    "**histórico** del precio, la **exploración** de patrones y la relación con el "
+    "**clima**, luego la **predicción** del día siguiente y el **desempeño** del modelo."
 )
 
 # --- Barra lateral: contexto de los modelos ---
@@ -292,24 +376,31 @@ with st.sidebar:
         "**Persistencia diaria** (referencia): asume que mañana, a cada hora, el "
         "precio será el de hoy a esa misma hora. Es simple y difícil de superar.\n\n"
         "**Modelo Lasso** (comparación): un modelo de aprendizaje automático, uno por "
-        "cada hora del día, con variables de clima y embalses."
+        "cada hora del día, con variables de clima y embalses.\n\n"
+        "**Aprendizaje residual** (comparación): la persistencia más una corrección "
+        "aprendida; destaca en el régimen volátil."
     )
-    comp = pd.DataFrame([
+    comp_filas = [
         {"Modelo": "Persistencia diaria", "MAE": round(persist_metrics["MAE"], 1),
          "RMSE": round(persist_metrics["RMSE"], 1), "R2": round(persist_metrics["R2"], 3)},
         {"Modelo": "Lasso", "MAE": round(lasso_metrics["MAE"], 1),
          "RMSE": round(lasso_metrics["RMSE"], 1), "R2": round(lasso_metrics["R2"], 3)},
-    ])
-    st.dataframe(comp, hide_index=True, use_container_width=True)
+    ]
+    if models_res is not None:
+        comp_filas.append({"Modelo": "Aprendizaje residual", "MAE": 70.5,
+                           "RMSE": 148.7, "R2": 0.847})
+    st.dataframe(pd.DataFrame(comp_filas), hide_index=True, use_container_width=True)
     st.caption(
         "MAE y RMSE son el error promedio del pronóstico, en pesos por kilovatio hora: "
         "entre más bajos, mejor. R2 indica qué tanto explica el modelo el "
         "comportamiento del precio. Conjunto de prueba: diciembre de 2022 a marzo de 2026."
     )
 
-tab_hist, tab_pred, tab_expl, tab_clima = st.tabs(
-    ["Histórico del precio", "Predicción del día siguiente",
-     "Explorar patrones", "Clima y precio"])
+# Orden del análisis: primero entender los datos (histórico, patrones, clima) y luego
+# el modelo (predicción y desempeño).
+tab_hist, tab_expl, tab_clima, tab_pred, tab_desemp, tab_carga = st.tabs(
+    ["Histórico del precio", "Explorar patrones", "Clima y precio",
+     "Predicción del día siguiente", "Desempeño del modelo", "Pronóstico con datos nuevos"])
 
 
 # ======================================================================== #
@@ -361,12 +452,14 @@ with tab_hist:
         m3.metric("Mínimo", f"${hist['minimo'].min():.1f}")
         m4.metric("Puntos mostrados", f"{len(hist)}")
 
+        # Franja del rango min-max en naranja semitransparente, legible en claro y oscuro.
+        color_rango = "rgba(251,146,60,0.30)" if oscuro else "rgba(234,88,12,0.18)"
         fig_h = go.Figure()
         fig_h.add_trace(go.Scatter(x=hist["FECHA"], y=hist["maximo"], mode="lines",
                                    line=dict(width=0), showlegend=False, hoverinfo="skip"))
         fig_h.add_trace(go.Scatter(x=hist["FECHA"], y=hist["minimo"], mode="lines", fill="tonexty",
-                                   fillcolor="rgba(37,99,235,0.12)", line=dict(width=0),
-                                   name="Rango del periodo", hoverinfo="skip"))
+                                   fillcolor=color_rango, line=dict(width=0),
+                                   name="Rango del día (mín-máx)", hoverinfo="skip"))
         fig_h.add_trace(go.Scatter(x=hist["FECHA"], y=hist["promedio"], mode="lines",
                                    name="Precio promedio", line=dict(color=AZUL, width=2)))
         fig_h.update_layout(xaxis_title="Fecha", yaxis_title="Precio de bolsa ($/kWh)",
@@ -380,6 +473,52 @@ with tab_hist:
 # Vista 2: predicción del día siguiente (navegación y modelos)
 # ======================================================================== #
 with tab_pred:
+    # --- Banner de prediccion automatica (si el pipeline diario esta activo) ---
+    pred_auto = load_prediccion_auto()
+    if pred_auto is not None:
+        from datetime import date as _hoy_date  # noqa: PLC0415
+        fecha_obj_auto = pd.to_datetime(pred_auto["fecha_objetivo"].iloc[0]).date()
+        fecha_base_auto = pd.to_datetime(pred_auto["fecha_base"].iloc[0]).date()
+        label_auto = "hoy" if fecha_obj_auto == _hoy_date.today() else fecha_larga_es(
+            pd.Timestamp(fecha_obj_auto))
+        with st.container(border=True):
+            st.markdown(
+                f"**Prediccion automatizada para {label_auto} "
+                f"({fecha_obj_auto.strftime('%d %b %Y')})** "
+                f"-- generada a partir de los precios del {fecha_base_auto.strftime('%d %b %Y')}."
+            )
+            prom_persist = float(pred_auto["persistencia"].mean())
+            prom_lasso = float(pred_auto["lasso"].mean())
+            prom_res = float(pred_auto["residual"].mean())
+            ca, cb, cc = st.columns(3)
+            ca.metric("Persistencia (prom. diario)", f"${prom_persist:.1f}/kWh")
+            cb.metric("Lasso (prom. diario)", f"${prom_lasso:.1f}/kWh")
+            cc.metric("Aprendizaje residual (prom.)", f"${prom_res:.1f}/kWh")
+            fig_auto = go.Figure()
+            fig_auto.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
+                               line_width=0, annotation_text="Franja pico",
+                               annotation_position="top left")
+            horas_auto = list(range(24))
+            fig_auto.add_trace(go.Scatter(
+                x=horas_auto, y=pred_auto["persistencia"].tolist(),
+                mode="lines+markers", name="Persistencia",
+                line=dict(color=AZUL, width=3), marker=dict(size=6)))
+            fig_auto.add_trace(go.Scatter(
+                x=horas_auto, y=pred_auto["lasso"].tolist(),
+                mode="lines+markers", name="Lasso",
+                line=dict(color=VERDE, width=2), marker=dict(size=5)))
+            fig_auto.add_trace(go.Scatter(
+                x=horas_auto, y=pred_auto["residual"].tolist(),
+                mode="lines+markers", name="Aprendizaje residual",
+                line=dict(color=NARANJA, width=2), marker=dict(size=5)))
+            fig_auto.update_layout(
+                xaxis_title="Hora del dia", yaxis_title="Precio ($/kWh)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                height=300, margin=dict(t=30, b=40),
+            )
+            st.plotly_chart(fig_auto, use_container_width=True)
+        st.divider()
+
     st.subheader("Elige un día y consulta la predicción del día siguiente")
     fechas_validas = df.dropna(subset=["fecha_objetivo"])
     fecha_min = fechas_validas["FECHA"].min().date()
@@ -402,10 +541,25 @@ with tab_pred:
     fecha_sel = st.session_state.fecha_pred
 
     st.markdown("**Mostrar en la gráfica:**")
-    m1, m2, m3 = st.columns(3)
-    ver_real = m1.checkbox("Precio real (precio observado día siguiente)", value=True)
-    ver_lasso = m2.checkbox("Modelo Lasso (día siguiente predicho)", value=True)
-    ver_persist = m3.checkbox("Persistencia diaria (día base)", value=True)
+    m1, m2, m3, m4 = st.columns(4)
+    ver_real = m1.checkbox("Precio real observado", value=True)
+    ver_lasso = m2.checkbox("Modelo Lasso", value=True)
+    ver_residual = m3.checkbox("Aprendizaje residual", value=models_res is not None,
+                               disabled=models_res is None)
+    ver_persist = m4.checkbox("Persistencia diaria", value=True)
+
+    intervalos = load_intervalos()
+    b1, b2 = st.columns([1.1, 1])
+    ver_banda = b1.checkbox("Mostrar intervalo de incertidumbre (90 %)", value=False,
+                            disabled=intervalos.empty,
+                            help="Banda conformal: el rango donde se espera que caiga el "
+                                 "precio real con un 90 % de probabilidad.")
+    opciones_banda = ["Lasso", "Persistencia"]
+    if models_res is not None:
+        opciones_banda.insert(1, "Aprendizaje residual")
+    modelo_banda = b2.selectbox("Intervalo del modelo", opciones_banda,
+                                disabled=(intervalos.empty or not ver_banda),
+                                label_visibility="collapsed")
 
     fila_match = df[df["FECHA"].dt.date == fecha_sel]
     if fila_match.empty:
@@ -416,6 +570,7 @@ with tab_pred:
         horas = list(range(24))
         pred_persist = [float(row[f"h{h:02d}"]) for h in range(24)]
         pred_ml = predict_ml(models, row)
+        pred_residual = predict_residual(models_res, row) if models_res is not None else None
         tiene_real = row[TARGET_COLS].notna().any()
         reales = [float(row[f"target_h{h:02d}"]) if tiene_real else np.nan for h in range(24)]
 
@@ -432,6 +587,24 @@ with tab_pred:
         fig = go.Figure()
         fig.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08, line_width=0,
                       annotation_text="Franja pico", annotation_position="top left")
+        # Banda de incertidumbre conformal del modelo seleccionado (detrás de las líneas).
+        if ver_banda and not intervalos.empty:
+            base_por_modelo = {"Lasso": pred_ml, "Persistencia": pred_persist,
+                               "Aprendizaje residual": pred_residual}
+            base_pred = base_por_modelo.get(modelo_banda) or pred_ml
+            iv = intervalos[intervalos["modelo"] == modelo_banda].set_index("hora")
+            lower = [base_pred[h] + float(iv.loc[h, "q_low"]) for h in horas]
+            upper = [base_pred[h] + float(iv.loc[h, "q_high"]) for h in horas]
+            fill_por_modelo = {"Lasso": "rgba(22,163,74,0.15)",
+                               "Persistencia": "rgba(37,99,235,0.15)",
+                               "Aprendizaje residual": "rgba(234,88,12,0.15)"}
+            fill_banda = fill_por_modelo.get(modelo_banda, "rgba(22,163,74,0.15)")
+            fig.add_trace(go.Scatter(x=horas, y=upper, mode="lines", line=dict(width=0),
+                                     showlegend=False, hoverinfo="skip"))
+            fig.add_trace(go.Scatter(x=horas, y=lower, mode="lines", fill="tonexty",
+                                     fillcolor=fill_banda, line=dict(width=0),
+                                     name=f"Intervalo 90 % ({modelo_banda})",
+                                     hoverinfo="skip"))
         if ver_persist:
             fig.add_trace(go.Scatter(x=horas, y=pred_persist, mode="lines+markers",
                                      name="Persistencia diaria (referencia)",
@@ -440,6 +613,10 @@ with tab_pred:
             fig.add_trace(go.Scatter(x=horas, y=pred_ml, mode="lines+markers",
                                      name="Modelo Lasso (comparación)",
                                      line=dict(color=VERDE, width=2), marker=dict(size=6)))
+        if ver_residual and pred_residual is not None:
+            fig.add_trace(go.Scatter(x=horas, y=pred_residual, mode="lines+markers",
+                                     name="Aprendizaje residual (comparación)",
+                                     line=dict(color=NARANJA, width=2), marker=dict(size=6)))
         if tiene_real and ver_real:
             fig.add_trace(go.Scatter(x=horas, y=reales, mode="lines+markers",
                                      name="Precio real observado",
@@ -453,14 +630,20 @@ with tab_pred:
         fig.update_layout(margin=dict(t=40, b=90))
         st.plotly_chart(fig, use_container_width=True)
 
-        st.markdown(
-            "| Línea | Qué representa |\n"
-            "|---|---|\n"
-            "| **Persistencia diaria** (azul) | Precio real del **día base**, repetido "
-            "como pronóstico del día siguiente. |\n"
-            "| **Modelo Lasso** (verde) | Pronóstico del modelo para el **día siguiente**. |\n"
-            "| **Precio real observado** (punteada) | Precio que **realmente ocurrió** el "
-            "día siguiente; aparece solo cuando ya hay datos de esa fecha. |"
+        if ver_banda and not intervalos.empty:
+            st.caption(
+                f"La **banda sombreada** es el intervalo de incertidumbre del **90 %** del "
+                f"modelo {modelo_banda}: con esa probabilidad el precio real cae dentro de "
+                f"ella. Se obtiene por predicción conformal sobre el conjunto de prueba y es "
+                f"más ancha en las horas de mayor volatilidad."
+            )
+
+        st.caption(
+            "\\* La línea **azul, persistencia diaria**, repite el precio real del día "
+            "base como pronóstico del día siguiente: es la referencia simple a superar. "
+            "La **verde** es el pronóstico del modelo Lasso, la **naranja** el del "
+            "aprendizaje residual y la **punteada** es el precio real observado, que "
+            "aparece solo cuando ya hay datos de esa fecha."
         )
 
         if tiene_real:
@@ -477,17 +660,16 @@ with tab_pred:
                 denom = np.abs(reales_arr) + np.abs(pred)
                 return float(np.mean(np.where(denom == 0, 0.0, 2 * np.abs(reales_arr - pred) / denom)) * 100)
 
-            met = pd.DataFrame({
-                "Métrica": ["MAE ($/kWh)", "RMSE ($/kWh)", "sMAPE (%)"],
-                "Lasso (día siguiente)": [round(_mae(pred_ml), 2), round(_rmse(pred_ml), 2),
-                                          round(_smape(pred_ml), 2)],
-                "Persistencia (día base)": [round(_mae(pred_persist), 2), round(_rmse(pred_persist), 2),
-                                            round(_smape(pred_persist), 2)],
-            })
-            met["Mejor"] = [
-                "Lasso" if l < p else ("Persistencia" if p < l else "Empate")
-                for l, p in zip(met["Lasso (día siguiente)"], met["Persistencia (día base)"])
-            ]
+            modelos_met = {"Lasso": pred_ml}
+            if pred_residual is not None:
+                modelos_met["Aprendizaje residual"] = pred_residual
+            modelos_met["Persistencia"] = pred_persist
+
+            met = pd.DataFrame({"Métrica": ["MAE ($/kWh)", "RMSE ($/kWh)", "sMAPE (%)"]})
+            for nombre, pred in modelos_met.items():
+                met[nombre] = [round(_mae(pred), 2), round(_rmse(pred), 2), round(_smape(pred), 2)]
+            cols_modelo = list(modelos_met.keys())
+            met["Mejor"] = [min(cols_modelo, key=lambda c: met.loc[i, c]) for i in met.index]
             st.markdown("**Métricas comparativas del día**")
             st.dataframe(met, use_container_width=True, hide_index=True)
             st.caption("Error del pronóstico del día siguiente frente al precio real observado; "
@@ -502,8 +684,10 @@ with tab_pred:
             "Hora": [f"{h:02d}:00" for h in horas],
             "Persistencia ($/kWh)": [round(p, 2) for p in pred_persist],
             "Lasso ($/kWh)": [round(p, 2) for p in pred_ml],
-            "Franja pico": ["Sí" if h in PEAK_HOURS else "" for h in horas],
         })
+        if pred_residual is not None:
+            tabla["Aprendizaje residual ($/kWh)"] = [round(p, 2) for p in pred_residual]
+        tabla["Franja pico"] = ["Sí" if h in PEAK_HOURS else "" for h in horas]
         if tiene_real:
             tabla["Real ($/kWh)"] = [round(reales[h], 2) for h in horas]
         st.dataframe(tabla, use_container_width=True, hide_index=True, height=300)
@@ -527,24 +711,86 @@ with tab_expl:
         larga = larga.sample(60000, random_state=42)
 
     st.markdown("**Distribución del precio por hora del día**")
-    fig_hora = px.box(larga, x="hora", y="precio",
+    # points=False oculta los valores atípicos: así las cajas se agrandan y se comparan
+    # mejor las medianas entre horas.
+    fig_hora = px.box(larga, x="hora", y="precio", points=False,
                       labels={"hora": "Hora del día", "precio": "Precio de bolsa ($/kWh)"},
                       color_discrete_sequence=[AZUL])
+    fig_hora.update_yaxes(range=[0, 720])
     st.plotly_chart(estilo_grafico(fig_hora, PLANTILLA, 400), use_container_width=True)
+    st.caption("Se omiten los valores atípicos y se acota el eje para apreciar mejor la "
+               "mediana y el rango típico de cada hora.")
 
     if "base_tipo_dia" in larga.columns:
         st.markdown("**Distribución del precio por tipo de día**")
         larga["Tipo de día"] = larga["base_tipo_dia"].map(TIPO_DIA_ES).fillna(larga["base_tipo_dia"])
         orden = ["Hábil", "Sábado", "Domingo", "Festivo"]
-        fig_tipo = px.box(larga, x="Tipo de día", y="precio",
+        fig_tipo = px.box(larga, x="Tipo de día", y="precio", points=False,
                           category_orders={"Tipo de día": orden},
                           labels={"precio": "Precio de bolsa ($/kWh)"},
                           color_discrete_sequence=[VERDE])
+        fig_tipo.update_yaxes(range=[0, 620])
         st.plotly_chart(estilo_grafico(fig_tipo, PLANTILLA, 400), use_container_width=True)
 
 
 # ======================================================================== #
-# Vista 4: clima y precio (ONI y embalses)
+# Vista 4: desempeño del modelo (error por hora y por régimen)
+# ======================================================================== #
+with tab_desemp:
+    st.subheader("¿Qué tan bien predice el modelo, y cuándo?")
+    st.caption("Evaluación sobre el conjunto de prueba (diciembre de 2022 a marzo de "
+               "2026), desde dos ángulos: el error a lo largo del día y según el régimen "
+               "del precio. Es el resultado central del proyecto.")
+
+    st.markdown("**Error medio por hora del día (MAE)**")
+    eph = load_error_por_hora()
+    if eph.empty:
+        st.info("No hay datos de error por hora disponibles.")
+    else:
+        fig_eph = px.line(
+            eph, x="hora", y="MAE", color="Modelo", markers=True,
+            labels={"hora": "Hora del día", "MAE": "MAE ($/kWh)"},
+            color_discrete_map={"Lasso": VERDE, "Persistencia": AZUL})
+        fig_eph.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08, line_width=0,
+                          annotation_text="Franja pico", annotation_position="top left")
+        fig_eph.update_xaxes(tickmode="linear", dtick=2)
+        fig_eph.update_layout(hovermode="x unified",
+                              legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                                          xanchor="right", x=1))
+        st.plotly_chart(estilo_grafico(fig_eph, PLANTILLA, 400), use_container_width=True)
+        st.caption("Entre más bajo el MAE, mejor. El error de ambos modelos crece en las "
+                   "horas de la tarde y la noche, que son las de mayor precio y "
+                   "volatilidad; es ahí donde el pronóstico es más difícil.")
+
+    st.markdown("**Desempeño según el régimen del precio**")
+    reg = load_regimen()
+    if reg.empty:
+        st.info("No hay datos de régimen disponibles.")
+    else:
+        destacadas = ["Persistencia diaria", "Lasso horario", "Aprendizaje residual"]
+        reg_f = reg[reg["estrategia"].isin(destacadas)].copy()
+        orden_reg = ["Precio calmo<br>(< 300 $/kWh)", "Precio volátil<br>(≥ 300 $/kWh)"]
+        orden_mod = ["Persistencia (referencia)", "Lasso", "Aprendizaje residual"]
+        fig_reg = px.bar(
+            reg_f, x="Régimen", y="MAE", color="Modelo", barmode="group",
+            text_auto=".0f",
+            category_orders={"Régimen": orden_reg, "Modelo": orden_mod},
+            labels={"MAE": "Error medio MAE ($/kWh)", "Régimen": ""},
+            color_discrete_map={"Persistencia (referencia)": AZUL, "Lasso": VERDE,
+                                "Aprendizaje residual": NARANJA})
+        fig_reg.update_traces(textfont_size=13, textposition="outside", cliponaxis=False)
+        fig_reg.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                                          xanchor="center", x=0.5, title_text=""))
+        st.plotly_chart(estilo_grafico(fig_reg, PLANTILLA, 440), use_container_width=True)
+        st.caption("El precio se separa en régimen calmo (menor a 300 $/kWh) y volátil "
+                   "(300 o más). En el régimen calmo la persistencia es imbatible, pero en "
+                   "el régimen volátil el Lasso y el aprendizaje residual la superan: ahí "
+                   "es donde el modelo aporta, y es justamente donde un error cuesta más "
+                   "caro. Este matiz es el hallazgo principal del trabajo.")
+
+
+# ======================================================================== #
+# Vista 5: clima y precio (ONI y embalses)
 # ======================================================================== #
 with tab_clima:
     st.subheader("Relación entre el precio y las condiciones climáticas")
@@ -558,27 +804,180 @@ with tab_clima:
     if clima_f.empty:
         st.info("No hay datos en el periodo seleccionado.")
     else:
-        fig_c = make_subplots(specs=[[{"secondary_y": True}]])
-        fig_c.add_trace(go.Scatter(x=clima_f["FECHA"], y=clima_f["precio_promedio"],
-                                   name="Precio promedio ($/kWh)", line=dict(color=AZUL, width=2)),
-                        secondary_y=False)
+        leyenda = dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+
+        def grafico_doble_eje(y2_col, y2_nombre, y2_titulo, color2, dash=None):
+            """Serie temporal con el precio (eje izquierdo) y una exógena (eje derecho)."""
+            f = make_subplots(specs=[[{"secondary_y": True}]])
+            f.add_trace(go.Scatter(x=clima_f["FECHA"], y=clima_f["precio_promedio"],
+                                   name="Precio promedio ($/kWh)",
+                                   line=dict(color=AZUL, width=2)), secondary_y=False)
+            f.add_trace(go.Scatter(x=clima_f["FECHA"], y=clima_f[y2_col], name=y2_nombre,
+                                   line=dict(color=color2, width=2, dash=dash)), secondary_y=True)
+            f.update_yaxes(title_text="Precio de bolsa ($/kWh)", secondary_y=False)
+            f.update_yaxes(title_text=y2_titulo, secondary_y=True)
+            f.update_layout(xaxis_title="Fecha", hovermode="x unified", legend=leyenda)
+            return estilo_grafico(f, PLANTILLA, 380)
+
         if "oni" in clima_f.columns:
-            fig_c.add_trace(go.Scatter(x=clima_f["FECHA"], y=clima_f["oni"],
-                                       name="Índice de El Niño (ONI)",
-                                       line=dict(color=NARANJA, width=2)), secondary_y=True)
+            st.markdown("**Precio de bolsa frente al Índice de El Niño (ONI)**")
+            st.plotly_chart(grafico_doble_eje("oni", "Índice ONI (El Niño)", "ONI", NARANJA),
+                            use_container_width=True)
+            st.caption("Los periodos de ONI positivo (fase de El Niño) suelen coincidir "
+                       "con precios de bolsa más altos.")
+
         if "embalse_porcentaje_diario" in clima_f.columns:
-            fig_c.add_trace(go.Scatter(x=clima_f["FECHA"], y=clima_f["embalse_porcentaje_diario"],
-                                       name="Nivel de embalses (%)",
-                                       line=dict(color=VERDE, width=2, dash="dot")),
-                            secondary_y=True)
-        fig_c.update_yaxes(title_text="Precio de bolsa ($/kWh)", secondary_y=False)
-        fig_c.update_yaxes(title_text="ONI y nivel de embalses", secondary_y=True)
-        fig_c.update_layout(xaxis_title="Fecha", hovermode="x unified",
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                                        xanchor="right", x=1))
-        st.plotly_chart(estilo_grafico(fig_c, PLANTILLA, 480), use_container_width=True)
-        st.caption("Un ONI positivo (fase de El Niño) suele coincidir con embalses más "
-                   "bajos y precios más altos; la fase de La Niña, con lo contrario.")
+            st.markdown("**Precio de bolsa frente al nivel de embalses**")
+            st.plotly_chart(grafico_doble_eje("embalse_porcentaje_diario",
+                                              "Nivel de embalses (%)", "Nivel de embalses (%)",
+                                              VERDE, dash="dot"),
+                            use_container_width=True)
+            st.caption("Un nivel de embalses más bajo (sequía) tiende a coincidir con "
+                       "precios más altos. El dato de embalses está disponible desde 2013.")
+
+        def grafico_dispersion(x_col, x_titulo, color):
+            """Dispersión de la exógena frente al precio sobre todo el histórico, con línea
+            de tendencia (mínimos cuadrados) y el coeficiente de correlación."""
+            d = clima[[x_col, "precio_promedio"]].dropna()  # histórico completo, no filtrado
+            if len(d) < 3:
+                return None, None
+            x, y = d[x_col].to_numpy(float), d["precio_promedio"].to_numpy(float)
+            m, b = np.polyfit(x, y, 1)
+            xs = np.array([x.min(), x.max()])
+            r = float(np.corrcoef(x, y)[0, 1])
+            f = go.Figure()
+            f.add_trace(go.Scatter(x=x, y=y, mode="markers", name="Días",
+                                   marker=dict(color=color, size=5, opacity=0.35)))
+            f.add_trace(go.Scatter(x=xs, y=m * xs + b, mode="lines", name="Tendencia",
+                                   line=dict(color=COLOR_REAL, width=2, dash="dash")))
+            f.update_layout(xaxis_title=x_titulo, yaxis_title="Precio de bolsa ($/kWh)",
+                            legend=leyenda)
+            return estilo_grafico(f, PLANTILLA, 360), r
+
+        st.markdown("**Asociación directa (todo el histórico)**")
+        st.caption("Cada punto es un día (serie completa, sin el filtro de periodo). La "
+                   "línea de tendencia resume la relación: su pendiente indica si el precio "
+                   "sube o baja con la variable.")
+        d1, d2 = st.columns(2)
+        if "oni" in clima.columns:
+            fig_s1, r1 = grafico_dispersion("oni", "Índice ONI (El Niño)", NARANJA)
+            if fig_s1 is not None:
+                d1.plotly_chart(fig_s1, use_container_width=True)
+                rel1 = "a mayor El Niño, mayor precio" if r1 >= 0 else "relación inversa"
+                d1.caption(f"Precio vs. ONI. Correlación r = {r1:.2f} ({rel1}).")
+        if "embalse_porcentaje_diario" in clima.columns:
+            fig_s2, r2 = grafico_dispersion("embalse_porcentaje_diario",
+                                            "Nivel de embalses (%)", VERDE)
+            if fig_s2 is not None:
+                d2.plotly_chart(fig_s2, use_container_width=True)
+                rel2 = "a menor nivel, mayor precio" if r2 <= 0 else "relación directa"
+                d2.caption(f"Precio vs. embalses. Correlación r = {r2:.2f} ({rel2}).")
+
+# ======================================================================== #
+# Vista 6: pronóstico con datos cargados por el usuario
+# ======================================================================== #
+with tab_carga:
+    st.subheader("Genera un pronóstico con tus propios datos")
+    st.caption(
+        "Sube un archivo CSV con uno o más días base en el formato de la base del "
+        "proyecto (las 24 columnas horarias h00…h23 y las variables predictoras). La "
+        "aplicación ejecuta los modelos y entrega el pronóstico del día siguiente. Para "
+        "una conexión automática en tiempo real desde XM, ver los trabajos futuros."
+    )
+
+    # Se quitan solo los precios objetivo (futuro); las variables de calendario del día
+    # objetivo (target_anio, target_dia, …) se conocen de antemano y el modelo las usa.
+    cols_precio_futuro = [f"target_h{h:02d}" for h in range(24)]
+    plantilla = df.drop(columns=cols_precio_futuro, errors="ignore").head(3)
+    st.download_button(
+        "Descargar plantilla de ejemplo (CSV)",
+        data=plantilla.to_csv(index=False).encode("utf-8-sig"),
+        file_name="plantilla_dia_base.csv", mime="text/csv",
+        help="Tres días base de ejemplo con todas las columnas que el modelo necesita.")
+
+    archivo = st.file_uploader("Archivo CSV con días base", type=["csv"])
+    if archivo is None:
+        st.info("Sube un CSV para generar el pronóstico. Puedes usar la plantilla de "
+                "ejemplo como referencia del formato.")
+    else:
+        try:
+            nuevo = pd.read_csv(archivo)
+        except Exception as exc:
+            st.error(f"No se pudo leer el archivo: {exc}")
+            nuevo = None
+
+        req_feats = sorted({f for m in models.values() for f in m["features"]})
+        if nuevo is not None and nuevo.empty:
+            st.error("El archivo no tiene filas.")
+        elif nuevo is not None:
+            faltan_horas = [c for c in HOUR_COLS if c not in nuevo.columns]
+            faltan_feats = [f for f in req_feats if f not in nuevo.columns]
+            if faltan_horas:
+                st.error("Faltan columnas de las horas del día base (h00…h23): "
+                         + ", ".join(faltan_horas[:6]) + ("…" if len(faltan_horas) > 6 else ""))
+            elif faltan_feats:
+                st.error(f"Faltan {len(faltan_feats)} variables que el modelo necesita. "
+                         f"Usa la plantilla como referencia. Ejemplos: "
+                         + ", ".join(faltan_feats[:6]) + ".")
+            else:
+                etiquetas = ([str(v) for v in nuevo["FECHA"]] if "FECHA" in nuevo.columns
+                             else [f"Fila {i + 1}" for i in range(len(nuevo))])
+                pos = st.selectbox("Día base a pronosticar", range(len(nuevo)),
+                                   format_func=lambda i: etiquetas[i])
+                row = nuevo.iloc[pos]
+
+                pred_persist_c = [float(row[f"h{h:02d}"]) for h in range(24)]
+                pred_ml_c = predict_ml(models, row)
+                pred_res_c = predict_residual(models_res, row) if models_res is not None else None
+                tcols = [f"target_h{h:02d}" for h in range(24)]
+                tiene_real_c = all(c in nuevo.columns for c in tcols) and row[tcols].notna().any()
+                reales_c = ([float(row[c]) for c in tcols] if tiene_real_c
+                            else [np.nan] * 24)
+
+                figc = go.Figure()
+                figc.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
+                               line_width=0, annotation_text="Franja pico",
+                               annotation_position="top left")
+                figc.add_trace(go.Scatter(x=list(range(24)), y=pred_persist_c,
+                                          mode="lines+markers", name="Persistencia diaria",
+                                          line=dict(color=AZUL, width=3), marker=dict(size=7)))
+                figc.add_trace(go.Scatter(x=list(range(24)), y=pred_ml_c, mode="lines+markers",
+                                          name="Modelo Lasso",
+                                          line=dict(color=VERDE, width=2), marker=dict(size=6)))
+                if pred_res_c is not None:
+                    figc.add_trace(go.Scatter(x=list(range(24)), y=pred_res_c,
+                                              mode="lines+markers", name="Aprendizaje residual",
+                                              line=dict(color=NARANJA, width=2), marker=dict(size=6)))
+                if tiene_real_c:
+                    figc.add_trace(go.Scatter(x=list(range(24)), y=reales_c, mode="lines+markers",
+                                              name="Precio real observado",
+                                              line=dict(color=COLOR_REAL, width=2, dash="dot"),
+                                              marker=dict(size=6)))
+                figc.update_layout(xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+                                   yaxis=dict(title="Precio de bolsa ($/kWh)"),
+                                   hovermode="x unified",
+                                   legend=dict(orientation="h", yanchor="top", y=-0.2,
+                                               xanchor="center", x=0.5))
+                figc = estilo_grafico(figc, PLANTILLA, 460)
+                figc.update_layout(margin=dict(t=40, b=90))
+                st.plotly_chart(figc, use_container_width=True)
+
+                salida = pd.DataFrame({
+                    "Hora": [f"{h:02d}:00" for h in range(24)],
+                    "Persistencia ($/kWh)": [round(p, 2) for p in pred_persist_c],
+                    "Lasso ($/kWh)": [round(p, 2) for p in pred_ml_c],
+                })
+                if pred_res_c is not None:
+                    salida["Aprendizaje residual ($/kWh)"] = [round(p, 2) for p in pred_res_c]
+                st.dataframe(salida, use_container_width=True, hide_index=True, height=300)
+                st.download_button(
+                    "Descargar pronóstico (CSV)",
+                    data=salida.to_csv(index=False).encode("utf-8-sig"),
+                    file_name="pronostico_datos_cargados.csv", mime="text/csv")
+                st.caption("El pronóstico usa los mismos modelos del proyecto. La calidad "
+                           "depende de que las variables del día base estén bien calculadas, "
+                           "como en la plantilla.")
+
 
 # --- Pie ---
 st.divider()

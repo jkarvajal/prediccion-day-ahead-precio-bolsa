@@ -1,0 +1,17 @@
+estrategia,regimen,n_obs,MAE
+Persistencia diaria,calmo (<300),12183,40.29
+Persistencia diaria,volatil (>=300),16281,90.388
+Lasso horario,calmo (<300),12183,59.035
+Lasso horario,volatil (>=300),16281,88.171
+Aprendizaje residual,calmo (<300),12183,46.629
+Aprendizaje residual,volatil (>=300),16281,88.35
+Modelo de dos etapas,calmo (<300),12183,57.15
+Modelo de dos etapas,volatil (>=300),16281,93.378
+Segmentacion por tipo de dia,calmo (<300),12183,54.639
+Segmentacion por tipo de dia,volatil (>=300),16281,89.245
+Hibrido con correccion en horas pico,calmo (<300),12183,39.048
+Hibrido con correccion en horas pico,volatil (>=300),16281,91.387
+Prophet,calmo (<300),12183,148.797
+Prophet,volatil (>=300),16281,219.807
+LSTM,calmo (<300),12183,49.155
+LSTM,volatil (>=300),16281,102.95

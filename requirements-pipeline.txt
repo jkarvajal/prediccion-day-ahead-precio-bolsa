@@ -10,6 +10,7 @@ holidays
 openpyxl
 requests
 python-docx
+pydataxm
 
 # Modelos especializados usados en la comparacion consolidada
 prophet

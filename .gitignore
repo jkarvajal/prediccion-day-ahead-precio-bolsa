@@ -17,6 +17,10 @@ data/outputs/*
 !data/processed/features_day_ahead.csv
 !data/outputs/hourly_dayahead_metrics_by_hour.csv
 !data/outputs/baseline_global_results.csv
+!data/outputs/baseline_hourly_results.csv
+!data/outputs/consolidado_por_regimen.csv
+!data/outputs/intervalos_conformales.csv
+!data/outputs/prediccion_automatica.csv
 
 # Cuadernos de trabajo: contienen graficas incrustadas que elevan mucho el peso
 # del repositorio y no son necesarios para el despliegue.
@@ -32,8 +36,7 @@ reuniones/
 
 # Scripts de redaccion del documento: contienen el texto integro de los
 # capitulos, de modo que se excluyen por la misma razon que los entregables.
-src/contenido_fase2.py
-src/construir_fase2.py
+src/legacy/
 
 # Configuracion local de herramientas
 .claude/
