@@ -1722,6 +1722,14 @@ CONCLUSIONES_POR_OBJETIVO = [
     "gratuito conectado al repositorio de código.",
 ]
 
+# Fase 3: versión del cuarto objetivo que suma la banda de incertidumbre conformal.
+CONCLUSIONES_CUARTO_OBJETIVO_F3 = (
+    "Respecto al cuarto objetivo, los resultados y el modelo seleccionado se comunicaron "
+    "mediante una aplicación web pública que presenta el histórico, la predicción del día "
+    "siguiente frente al precio real observado con su banda de incertidumbre conformal, "
+    "la exploración de patrones y la relación con el clima, publicada en un servicio de "
+    "alojamiento gratuito conectado al repositorio de código.")
+
 CONCLUSIONES_PREGUNTA = [
     "En conjunto, estos resultados responden a la pregunta que orientó la "
     "investigación: en qué medida un modelo de predicción del precio horario de bolsa "
@@ -1801,12 +1809,16 @@ CONCLUSIONES_RECOMENDACIONES = [
 ]
 
 
-def conclusiones(doc):
+def conclusiones(doc, fase=2):
     titulo1(doc, "Conclusiones, recomendaciones y limitaciones")
     for parr in CONCLUSIONES_ENFOQUE:
         parrafo(doc, parr)
     titulo2(doc, "Conclusiones por objetivo")
-    for parr in CONCLUSIONES_POR_OBJETIVO:
+    objetivos = list(CONCLUSIONES_POR_OBJETIVO)
+    if fase >= 3:
+        # Fase 3: el cuarto objetivo refleja la banda de incertidumbre conformal.
+        objetivos[-1] = CONCLUSIONES_CUARTO_OBJETIVO_F3
+    for parr in objetivos:
         parrafo(doc, parr)
     titulo2(doc, "Respuesta a la pregunta de investigación")
     for parr in CONCLUSIONES_PREGUNTA:
@@ -1932,6 +1944,18 @@ DISCUSION_CONTRIBUCION = [
     "analítico, sino que se traducen en una herramienta accesible para la lectura de "
     "corto plazo del mercado.",
 
+    "Dentro de ese plano práctico, un aporte de valor adicional es la incorporación de "
+    "intervalos de predicción conformales a la comunicación del pronóstico. Más allá del "
+    "valor puntual esperado para cada hora, la herramienta muestra una banda de "
+    "incertidumbre al 90 %, construida a partir de los errores del modelo en el conjunto "
+    "de prueba y, por lo tanto, sin supuestos sobre la distribución del error, que se "
+    "ensancha en las horas de mayor volatilidad. Esta cuantificación de la incertidumbre "
+    "conecta con la corriente de pronóstico probabilístico que la literatura reciente "
+    "destaca (Lago et al., 2021; Maciejowska et al., 2026) y resulta especialmente "
+    "pertinente en un mercado de episodios extremos, pues ofrece a los agentes no solo "
+    "una estimación central, sino el rango plausible del precio, una base más informada "
+    "para la lectura de riesgo de corto plazo.",
+
     "Para la disciplina, el aporte es una pieza de evidencia empírica, referida a un "
     "mercado hidro-dependiente poco representado en la literatura internacional, que "
     "respalda la tesis de que las líneas base simples son competitivas y que las mejoras "
@@ -2009,7 +2033,7 @@ def main(fase=2):
         salto_pagina(doc)
         discusion(doc)
     salto_pagina(doc)
-    conclusiones(doc)
+    conclusiones(doc, fase)
     salto_pagina(doc)
     referencias(doc)
 
