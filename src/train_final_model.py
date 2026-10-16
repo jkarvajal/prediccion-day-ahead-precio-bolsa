@@ -1,8 +1,8 @@
 """
-Entrena y persiste el modelo final de predicción day-ahead (24 horas)
-del precio de bolsa, replicando la configuración ganadora del notebook
-07_modelos_horarios_dayahead (Lasso con variables exógenas, un modelo
-por hora con selección de variables específica por hora).
+Entrena y persiste el modelo final de predicción del precio horario de bolsa
+para el día siguiente, replicando la configuración ganadora del notebook de
+modelos horarios (Lasso con variables exógenas, un modelo por hora con
+selección de variables específica por hora).
 
 Genera en la carpeta models/:
 - modelo_final_dayahead.joblib : dict {hora: (pipeline, lista_features)}
