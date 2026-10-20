@@ -714,11 +714,18 @@ MARCO_ESTADO_ARTE = [
     "El pronóstico del precio de electricidad es un campo consolidado a escala "
     "internacional, con revisiones que sistematizan métodos, métricas y buenas "
     "prácticas (Weron, 2014; Lago et al., 2021; Piotrowski, 2026; Dudek, 2026). En "
-    "contraste, la producción específica sobre el mercado colombiano es reducida: en la "
-    "revisión sistemática de este trabajo, realizada en Scopus y Web of Science para el "
-    "periodo 2021 a 2026, la búsqueda general identificó 190 registros, mientras que la "
-    "búsqueda acotada al caso colombiano arrojó apenas 16, lo que confirma la escasez de "
-    "literatura local. A esta búsqueda sistemática se sumó una búsqueda complementaria de "
+    "contraste, la producción específica sobre el mercado colombiano es reducida. La "
+    "revisión de literatura de este trabajo estructuró la pregunta con el marco PICOC y "
+    "siguió la guía de reporte PRISMA 2020 para la búsqueda sistemática, realizada en "
+    "Scopus y Web of Science para el periodo 2021 a 2026. En la fase de identificación se "
+    "reunieron 190 registros (137 de Scopus y 53 de Web of Science); en el cribado se "
+    "eliminaron 6 duplicados y, de los 184 registros revisados por título y resumen, se "
+    "descartaron 25; en la elegibilidad se evaluaron 159 textos completos y se excluyeron "
+    "139 con motivo, de modo que se incluyeron 22 estudios en la síntesis, 2 de ellos "
+    "incorporados por bola de nieve; la Figura 1 resume el proceso de selección. La "
+    "búsqueda acotada al caso colombiano arrojó apenas "
+    "16 registros, lo que confirma la escasez de literatura local. A esta búsqueda "
+    "sistemática se sumó una búsqueda complementaria de "
     "tipo manual, por revisión de referencias y por autor, para incorporar literatura "
     "fundacional y específica del caso colombiano publicada fuera de la ventana temporal: "
     "tanto los trabajos pioneros de pronóstico del precio de bolsa en Colombia como la "
@@ -797,7 +804,13 @@ def marco(doc):
     for parr in MARCO_DETERMINANTES:
         parrafo(doc, parr)
     titulo2(doc, "El pronóstico del precio de electricidad: enfoques y estado del arte")
-    for parr in MARCO_ESTADO_ARTE:
+    parrafo(doc, MARCO_ESTADO_ARTE[0])
+    figura(doc, "diagrama_prisma.png",
+           "Diagrama de flujo PRISMA 2020 de la revisión sistemática",
+           nota="Identificación, cribado, elegibilidad e inclusión de la búsqueda "
+                "sistemática en Scopus y Web of Science para el periodo 2021 a 2026.",
+           ancho_cm=12.0)
+    for parr in MARCO_ESTADO_ARTE[1:]:
         parrafo(doc, parr)
     titulo2(doc, "Evaluación y líneas base")
     for parr in MARCO_EVALUACION:
@@ -1012,7 +1025,7 @@ CAP2_ENFOQUE = [
 ]
 
 CAP2_PERFIL = [
-    "El precio presenta un perfil horario regular, que sintetiza la Figura 1. Alcanza "
+    "El precio presenta un perfil horario regular, que sintetiza la Figura 2. Alcanza"
     "su nivel más bajo en la "
     "madrugada, con un valle alrededor de las tres de la mañana (precio promedio cercano "
     "a 204 COP/kWh y mediana cercana a 132 COP/kWh), asciende de forma sostenida durante "
@@ -1084,7 +1097,7 @@ CAP2_EXOGENAS = [
     "efecto esperado de una mayor disponibilidad hídrica sobre el precio.",
 
     "El valor predictivo del clima se aprecia mejor en su carácter anticipado. La "
-    "correlación entre el ONI y el nivel de embalses, que ilustra la Figura 2, se vuelve "
+    "correlación entre el ONI y el nivel de embalses, que ilustra la Figura 3, se vuelve "
     "más negativa a medida que "
     "aumenta el rezago, pasando de -0,20 de manera contemporánea a -0,49 con un rezago "
     "de ciento ochenta días. En otras palabras, la señal climática anticipa en varios "
@@ -1213,7 +1226,7 @@ CAP3_RESULTADOS = [
     "persistencia diaria: la referencia obtiene el menor error absoluto medio. Sin "
     "embargo, varias estrategias logran un RMSE y un R2 claramente mejores, lo que "
     "indica que, sin reducir el error promedio, sí atenúan los errores más grandes. La "
-    "Figura 3 ilustra este compromiso entre MAE y RMSE.",
+    "Figura 4 ilustra este compromiso entre MAE y RMSE.",
 ]
 
 CAP3_RESULTADOS_TABLA = [
@@ -1251,7 +1264,7 @@ CAP3_REGIMEN = [
     "mientras que en el régimen volátil (precios iguales o superiores a 300) el Lasso "
     "horario y el aprendizaje residual logran el menor MAE, por debajo de la "
     "persistencia. Es decir, los modelos aportan precisamente donde la referencia es más "
-    "débil: en los episodios de alto precio. La Figura 4 muestra esta diferencia por "
+    "débil: en los episodios de alto precio. La Figura 5 muestra esta diferencia por "
     "régimen.",
 
     "La recalibración periódica refuerza este resultado. Un Lasso reajustado cada mes "
@@ -1419,7 +1432,7 @@ CAP4_COHERENCIA = [
     "referencia principal, reflejando que es insuperable en error absoluto medio, "
     "mientras que el modelo Lasso aparece como comparación.",
 
-    "La Figura 5 reproduce esta vista para un día de ejemplo. Las tres curvas permiten "
+    "La Figura 6 reproduce esta vista para un día de ejemplo. Las tres curvas permiten "
     "apreciar de un vistazo qué tan bien se ajustan los pronósticos al precio que "
     "realmente ocurrió, y las métricas del día cuantifican esa distancia. Al mostrar las "
     "tres curvas juntas, la aplicación no disimula la fortaleza de la línea base, en "
@@ -1438,7 +1451,7 @@ CAP4_COHERENCIA_F3 = [
     "error absoluto medio, mientras que el modelo Lasso y el aprendizaje residual aparecen "
     "como comparación.",
 
-    "La Figura 5 reproduce esta vista para un día de ejemplo. Las curvas de los tres "
+    "La Figura 6 reproduce esta vista para un día de ejemplo. Las curvas de los tres "
     "enfoques, junto con el precio real, permiten apreciar de un vistazo qué tan bien se "
     "ajustan los pronósticos al precio que realmente ocurrió, y las métricas del día "
     "cuantifican esa distancia. Al mostrar las tres estrategias juntas, la aplicación no "
@@ -1545,8 +1558,9 @@ REFERENCIAS = [
     "approach for accurate day-ahead electricity price forecasting. Engineering "
     "Applications of Artificial Intelligence. https://doi.org/10.1016/j.engappai.2025.112721",
 
-    "Aslam, U. y cols. (2026). Graph-X: Graph-structured deep learning for price "
-    "forecasting. Mathematics, 14(16), 2974. https://doi.org/10.3390/math14162974",
+    "Aslam, U., Kumar, V., Niazi, M. A. y Hassan, S. R. (2026). Graph-X: "
+    "Graph-structured deep learning for price forecasting. Mathematics, 14(16), 2974. "
+    "https://doi.org/10.3390/math14162974",
 
     "Balagula, Y., Baimel, D. y Aharon, I. (2026). Comparing time series and neural "
     "network models of long memory for electricity price forecasting. Results in "
@@ -1585,10 +1599,10 @@ REFERENCIAS = [
     "review of methods and evaluation metrics. Energies, 19(15), 3552. "
     "https://doi.org/10.3390/en19153552",
 
-    "Fan, H., Liu, W. y cols. (2026a). EPformer: Unlocking day-ahead electricity price "
-    "forecasting accuracy using the time-frequency domain feature learning strategy "
-    "considering renewable energy. Renewable Energy. "
-    "https://doi.org/10.1016/j.renene.2026.125296",
+    "Fan, H., Liu, W., Zhang, Z., Run, W., Duan, Y. y Liu, D. (2026a). EPformer: "
+    "Unlocking day-ahead electricity price forecasting accuracy using the time-frequency "
+    "domain feature learning strategy considering renewable energy. Renewable Energy, "
+    "261, 125296. https://doi.org/10.1016/j.renene.2026.125296",
 
     "Fan, H., Yang, Y., Liu, W., Lu, Y., Liu, D. y Ma, T. (2026b). EP-Net: End-to-end "
     "probabilistic day-ahead electricity price forecasting with multi-channel fusion. "
@@ -1638,10 +1652,10 @@ REFERENCIAS = [
     "Revista de Economía del Rosario, 20(1), 127-161. "
     "https://doi.org/10.12804/revistas.urosario.edu.co/economia/a.6152",
 
-    "Ni, T., Hou, H., Wu, X., Yang, J. y cols. (2026). AI-driven probabilistic day-ahead "
-    "electricity price forecasting with tail risk mitigation via dynamic spike "
-    "calibration. IEEE Transactions on Consumer Electronics, 72(3), 6417. "
-    "https://doi.org/10.1109/TCE.2026.3679105",
+    "Ni, T., Hou, H., Wu, X., Yang, J., Dong, Z. Y. y Zhang, Z. (2026). AI-driven "
+    "probabilistic day-ahead electricity price forecasting with tail risk mitigation via "
+    "dynamic spike calibration. IEEE Transactions on Consumer Electronics, 72(3), "
+    "6417-6427. https://doi.org/10.1109/TCE.2026.3679105",
 
     "Piotrowski, P. (2026). Short-term electricity price forecasting: A review of point "
     "forecasting methods, metrics, and empirical evaluation. Energies, 19(17), 4000. "
