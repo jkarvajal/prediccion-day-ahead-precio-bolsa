@@ -473,52 +473,6 @@ with tab_hist:
 # Vista 2: predicción del día siguiente (navegación y modelos)
 # ======================================================================== #
 with tab_pred:
-    # --- Banner de prediccion automatica (si el pipeline diario esta activo) ---
-    pred_auto = load_prediccion_auto()
-    if pred_auto is not None:
-        from datetime import date as _hoy_date  # noqa: PLC0415
-        fecha_obj_auto = pd.to_datetime(pred_auto["fecha_objetivo"].iloc[0]).date()
-        fecha_base_auto = pd.to_datetime(pred_auto["fecha_base"].iloc[0]).date()
-        label_auto = "hoy" if fecha_obj_auto == _hoy_date.today() else fecha_larga_es(
-            pd.Timestamp(fecha_obj_auto))
-        with st.container(border=True):
-            st.markdown(
-                f"**Prediccion automatizada para {label_auto} "
-                f"({fecha_obj_auto.strftime('%d %b %Y')})** "
-                f"-- generada a partir de los precios del {fecha_base_auto.strftime('%d %b %Y')}."
-            )
-            prom_persist = float(pred_auto["persistencia"].mean())
-            prom_lasso = float(pred_auto["lasso"].mean())
-            prom_res = float(pred_auto["residual"].mean())
-            ca, cb, cc = st.columns(3)
-            ca.metric("Persistencia (prom. diario)", f"${prom_persist:.1f}/kWh")
-            cb.metric("Lasso (prom. diario)", f"${prom_lasso:.1f}/kWh")
-            cc.metric("Aprendizaje residual (prom.)", f"${prom_res:.1f}/kWh")
-            fig_auto = go.Figure()
-            fig_auto.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
-                               line_width=0, annotation_text="Franja pico",
-                               annotation_position="top left")
-            horas_auto = list(range(24))
-            fig_auto.add_trace(go.Scatter(
-                x=horas_auto, y=pred_auto["persistencia"].tolist(),
-                mode="lines+markers", name="Persistencia",
-                line=dict(color=AZUL, width=3), marker=dict(size=6)))
-            fig_auto.add_trace(go.Scatter(
-                x=horas_auto, y=pred_auto["lasso"].tolist(),
-                mode="lines+markers", name="Lasso",
-                line=dict(color=VERDE, width=2), marker=dict(size=5)))
-            fig_auto.add_trace(go.Scatter(
-                x=horas_auto, y=pred_auto["residual"].tolist(),
-                mode="lines+markers", name="Aprendizaje residual",
-                line=dict(color=NARANJA, width=2), marker=dict(size=5)))
-            fig_auto.update_layout(
-                xaxis_title="Hora del dia", yaxis_title="Precio ($/kWh)",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                height=300, margin=dict(t=30, b=40),
-            )
-            st.plotly_chart(fig_auto, use_container_width=True)
-        st.divider()
-
     st.subheader("Elige un día y consulta la predicción del día siguiente")
     fechas_validas = df.dropna(subset=["fecha_objetivo"])
     fecha_min = fechas_validas["FECHA"].min().date()
@@ -877,6 +831,56 @@ with tab_clima:
 # Vista 6: pronóstico con datos cargados por el usuario
 # ======================================================================== #
 with tab_carga:
+    # --- Banner de prediccion automatica (pipeline diario GitHub Actions) ---
+    pred_auto = load_prediccion_auto()
+    if pred_auto is not None:
+        from datetime import date as _hoy_date  # noqa: PLC0415
+        fecha_obj_auto = pd.to_datetime(pred_auto["fecha_objetivo"].iloc[0]).date()
+        fecha_base_auto = pd.to_datetime(pred_auto["fecha_base"].iloc[0]).date()
+        label_auto = "hoy" if fecha_obj_auto == _hoy_date.today() else fecha_larga_es(
+            pd.Timestamp(fecha_obj_auto))
+        st.subheader("Prediccion automatizada (pipeline diario)")
+        st.caption(
+            f"Generada automaticamente a partir de los precios del "
+            f"{fecha_base_auto.strftime('%d %b %Y')} via GitHub Actions + API de XM."
+        )
+        with st.container(border=True):
+            st.markdown(
+                f"**Pronostico para {label_auto} "
+                f"({fecha_obj_auto.strftime('%d %b %Y')})**"
+            )
+            prom_persist = float(pred_auto["persistencia"].mean())
+            prom_lasso = float(pred_auto["lasso"].mean())
+            prom_res = float(pred_auto["residual"].mean())
+            ca, cb, cc = st.columns(3)
+            ca.metric("Persistencia (prom. diario)", f"${prom_persist:.1f}/kWh")
+            cb.metric("Lasso (prom. diario)", f"${prom_lasso:.1f}/kWh")
+            cc.metric("Aprendizaje residual (prom.)", f"${prom_res:.1f}/kWh")
+            fig_auto = go.Figure()
+            fig_auto.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
+                               line_width=0, annotation_text="Franja pico",
+                               annotation_position="top left")
+            horas_auto = list(range(24))
+            fig_auto.add_trace(go.Scatter(
+                x=horas_auto, y=pred_auto["persistencia"].tolist(),
+                mode="lines+markers", name="Persistencia",
+                line=dict(color=AZUL, width=3), marker=dict(size=6)))
+            fig_auto.add_trace(go.Scatter(
+                x=horas_auto, y=pred_auto["lasso"].tolist(),
+                mode="lines+markers", name="Lasso",
+                line=dict(color=VERDE, width=2), marker=dict(size=5)))
+            fig_auto.add_trace(go.Scatter(
+                x=horas_auto, y=pred_auto["residual"].tolist(),
+                mode="lines+markers", name="Aprendizaje residual",
+                line=dict(color=NARANJA, width=2), marker=dict(size=5)))
+            fig_auto.update_layout(
+                xaxis_title="Hora del dia", yaxis_title="Precio ($/kWh)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                height=300, margin=dict(t=30, b=40),
+            )
+            st.plotly_chart(fig_auto, use_container_width=True)
+        st.divider()
+
     st.subheader("Genera un pronóstico con tus propios datos")
     st.caption(
         "Sube un archivo CSV con uno o más días base en el formato de la base del "
