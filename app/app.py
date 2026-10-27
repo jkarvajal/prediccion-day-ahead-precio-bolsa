@@ -55,6 +55,21 @@ VERDE = "#16a34a"
 NEGRO = "#111827"
 NARANJA = "#ea580c"
 
+# --- Paleta del modo oscuro ---
+# Superficie en tono pizarra (no casi-negro) con un panel elevado para que las
+# graficas resalten del fondo, y series re-escaladas a la banda oscura para que
+# conserven contraste sobre el panel. Validadas con la guia de visualizacion:
+# sobre la superficie del panel las tres series pasan contraste >= 3:1 y
+# separacion CVD (azul/verde/naranja).
+DARK_PAGE = "#202838"      # fondo de la pagina
+DARK_PANEL = "#283243"     # superficie elevada de las graficas
+DARK_SIDEBAR = "#1a2230"   # barra lateral, un paso mas oscura para separarla
+DARK_GRID = "#3b4759"      # lineas de rejilla (visibles pero recesivas)
+DARK_AXIS = "#55617a"      # lineas de eje y de cero
+AZUL_OSCURO = "#3987e5"
+VERDE_OSCURO = "#199e70"
+NARANJA_OSCURO = "#d95926"
+
 DIAS_ES = {
     "Monday": "Lunes", "Tuesday": "Martes", "Wednesday": "Miércoles",
     "Thursday": "Jueves", "Friday": "Viernes", "Saturday": "Sábado",
@@ -245,8 +260,15 @@ def predict_residual(models_res, row):
 
 
 def estilo_grafico(fig, plantilla, alto=440):
+    es_oscuro = plantilla == "plotly_dark"
+    # En oscuro el area de trazado usa el panel elevado (no transparente) para
+    # separarse del fondo; el area exterior queda transparente y hereda la pagina.
     fig.update_layout(template=plantilla, paper_bgcolor="rgba(0,0,0,0)",
-                      plot_bgcolor="rgba(0,0,0,0)", height=alto, margin=dict(t=40))
+                      plot_bgcolor=DARK_PANEL if es_oscuro else "rgba(0,0,0,0)",
+                      height=alto, margin=dict(t=40))
+    if es_oscuro:
+        fig.update_xaxes(gridcolor=DARK_GRID, zerolinecolor=DARK_AXIS, linecolor=DARK_AXIS)
+        fig.update_yaxes(gridcolor=DARK_GRID, zerolinecolor=DARK_AXIS, linecolor=DARK_AXIS)
     return fig
 
 
@@ -273,6 +295,12 @@ with st.sidebar:
 PLANTILLA = "plotly_dark" if oscuro else "plotly_white"
 COLOR_REAL = "#e5e7eb" if oscuro else NEGRO
 
+# En modo oscuro se usan las series re-escaladas a la banda oscura, para que
+# resalten sobre el panel elevado. Se reasignan aqui (antes de los estilos y las
+# pestañas) para que todas las graficas y el resaltado de la pestaña activa las usen.
+if oscuro:
+    AZUL, VERDE, NARANJA = AZUL_OSCURO, VERDE_OSCURO, NARANJA_OSCURO
+
 # --- Estilo de las pestañas: las inactivas en color neutro (no azul de enlace),
 # la activa en negrita con fondo e indicador visibles, para que se reconozcan
 # como pestañas y no como texto plano. ---
@@ -291,14 +319,14 @@ _BTN_HOVER_FONDO = "#262a33" if oscuro else "#f1f5f9"
 # CSS del modo oscuro. Se interpola dentro del mismo bloque de estilos de abajo (no
 # como un st.markdown aparte) para que la cantidad de elementos antes de las pestañas
 # no cambie al alternar el tema: así st.tabs no se re-monta y conserva la pestaña activa.
-_dark_css = """
-    .stApp { background-color: #1c212c !important; }
+_dark_css = f"""
+    .stApp {{ background-color: {DARK_PAGE} !important; }}
     .stApp, .stApp p, .stApp span, .stApp label, .stApp li,
     h1, h2, h3, h4, [data-testid="stMetricValue"],
-    [data-testid="stMetricLabel"], [data-testid="stMetricDelta"] { color: #fafafa !important; }
-    [data-testid="stSidebar"] { background-color: #242a38 !important; }
-    [data-testid="stSidebar"] * { color: #e5e7eb !important; }
-    [data-testid="stHeader"] { background: rgba(0, 0, 0, 0) !important; }
+    [data-testid="stMetricLabel"], [data-testid="stMetricDelta"] {{ color: #fafafa !important; }}
+    [data-testid="stSidebar"] {{ background-color: {DARK_SIDEBAR} !important; }}
+    [data-testid="stSidebar"] * {{ color: #e5e7eb !important; }}
+    [data-testid="stHeader"] {{ background: rgba(0, 0, 0, 0) !important; }}
 """ if oscuro else ""
 
 st.markdown(
@@ -901,8 +929,9 @@ with tab_carga:
             fig_auto.update_layout(
                 xaxis_title="Hora del dia", yaxis_title="Precio ($/kWh)",
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                height=300, margin=dict(t=30, b=40),
             )
+            fig_auto = estilo_grafico(fig_auto, PLANTILLA, 300)
+            fig_auto.update_layout(margin=dict(t=30, b=40))
             st.plotly_chart(fig_auto, use_container_width=True)
         st.divider()
 
