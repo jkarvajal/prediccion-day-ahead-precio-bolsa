@@ -288,6 +288,19 @@ _BTN_TEXTO = "#fafafa" if oscuro else "#111827"
 _BTN_BORDE = "#3f3f46" if oscuro else "#d1d5db"
 _BTN_HOVER_FONDO = "#262a33" if oscuro else "#f1f5f9"
 
+# CSS del modo oscuro. Se interpola dentro del mismo bloque de estilos de abajo (no
+# como un st.markdown aparte) para que la cantidad de elementos antes de las pestañas
+# no cambie al alternar el tema: así st.tabs no se re-monta y conserva la pestaña activa.
+_dark_css = """
+    .stApp { background-color: #1c212c !important; }
+    .stApp, .stApp p, .stApp span, .stApp label, .stApp li,
+    h1, h2, h3, h4, [data-testid="stMetricValue"],
+    [data-testid="stMetricLabel"], [data-testid="stMetricDelta"] { color: #fafafa !important; }
+    [data-testid="stSidebar"] { background-color: #242a38 !important; }
+    [data-testid="stSidebar"] * { color: #e5e7eb !important; }
+    [data-testid="stHeader"] { background: rgba(0, 0, 0, 0) !important; }
+""" if oscuro else ""
+
 st.markdown(
     f"""
     <style>
@@ -340,26 +353,11 @@ st.markdown(
         background-color: {AZUL} !important;
         height: 3px;
     }}
+    {_dark_css}
     </style>
     """,
     unsafe_allow_html=True,
 )
-
-if oscuro:
-    st.markdown(
-        """
-        <style>
-        .stApp { background-color: #1c212c !important; }
-        .stApp, .stApp p, .stApp span, .stApp label, .stApp li,
-        h1, h2, h3, h4, [data-testid="stMetricValue"],
-        [data-testid="stMetricLabel"], [data-testid="stMetricDelta"] { color: #fafafa !important; }
-        [data-testid="stSidebar"] { background-color: #242a38 !important; }
-        [data-testid="stSidebar"] * { color: #e5e7eb !important; }
-        [data-testid="stHeader"] { background: rgba(0, 0, 0, 0) !important; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 # --- Encabezado ---
 st.title("Precio de bolsa de energía: histórico, predicción y exploración")
@@ -880,7 +878,7 @@ with tab_carga:
             _mae_persist = round(persist_metrics["MAE"], 1)
             st.caption(
                 f"Margen de error historico del modelo (conjunto de prueba, dic 2022 - mar 2026): "
-                f"Lasso MAE = **{_mae_lasso} $/kWh** | Persistencia MAE = **{_mae_persist} $/kWh**. "
+                f"Lasso MAE = **{_mae_lasso} \\$/kWh** | Persistencia MAE = **{_mae_persist} \\$/kWh**. "
                 f"El precio real puede diferir del pronostico en ese margen aproximado."
             )
             fig_auto = go.Figure()
