@@ -396,6 +396,26 @@ with st.sidebar:
         "comportamiento del precio. Conjunto de prueba: diciembre de 2022 a marzo de 2026."
     )
 
+with st.expander("¿Cómo usar esta aplicación?"):
+    st.markdown(
+        "La aplicación tiene **seis pestañas** que siguen el orden del análisis:\n\n"
+        "- **Histórico del precio**: evolución del precio de bolsa desde 2012, con "
+        "filtros de periodo y agregaciones diaria, semanal y mensual.\n"
+        "- **Explorar patrones**: distribución del precio por hora del día y por tipo "
+        "de día (hábil, sábado, domingo, festivo), usando diagramas de caja.\n"
+        "- **Clima y precio**: relación del precio con el índice de El Niño (ONI) y "
+        "el nivel de embalses, con gráficas de serie temporal y dispersión.\n"
+        "- **Predicción del día siguiente**: elige un día base con los botones o el "
+        "calendario, selecciona qué modelos mostrar y consulta el pronóstico horario. "
+        "Si el día ya ocurrió, aparece también el precio real observado y las métricas "
+        "comparativas (MAE, RMSE, sMAPE).\n"
+        "- **Desempeño del modelo**: error medio por hora del día y comparación según "
+        "el régimen del precio (calmo o volátil). Es el resultado central del proyecto.\n"
+        "- **Pronóstico con datos nuevos**: predicción automática del pipeline diario "
+        "(actualizada cada mañana desde XM) y carga manual de un CSV con días base "
+        "propios para generar pronósticos con los mismos modelos."
+    )
+
 # Orden del análisis: primero entender los datos (histórico, patrones, clima) y luego
 # el modelo (predicción y desempeño).
 tab_hist, tab_expl, tab_clima, tab_pred, tab_desemp, tab_carga = st.tabs(
@@ -670,10 +690,10 @@ with tab_expl:
     fig_hora = px.box(larga, x="hora", y="precio", points=False,
                       labels={"hora": "Hora del día", "precio": "Precio de bolsa ($/kWh)"},
                       color_discrete_sequence=[AZUL])
-    fig_hora.update_yaxes(range=[0, 720])
+    fig_hora.update_traces(whiskerwidth=0.5)
     st.plotly_chart(estilo_grafico(fig_hora, PLANTILLA, 400), use_container_width=True)
-    st.caption("Se omiten los valores atípicos y se acota el eje para apreciar mejor la "
-               "mediana y el rango típico de cada hora.")
+    st.caption("Los bigotes llegan hasta 1.5 veces el rango intercuartílico. "
+               "Los valores individuales más extremos se omiten para no distorsionar la escala.")
 
     if "base_tipo_dia" in larga.columns:
         st.markdown("**Distribución del precio por tipo de día**")
@@ -683,7 +703,7 @@ with tab_expl:
                           category_orders={"Tipo de día": orden},
                           labels={"precio": "Precio de bolsa ($/kWh)"},
                           color_discrete_sequence=[VERDE])
-        fig_tipo.update_yaxes(range=[0, 620])
+        fig_tipo.update_traces(whiskerwidth=0.5)
         st.plotly_chart(estilo_grafico(fig_tipo, PLANTILLA, 400), use_container_width=True)
 
 
@@ -856,6 +876,13 @@ with tab_carga:
             ca.metric("Persistencia (prom. diario)", f"${prom_persist:.1f}/kWh")
             cb.metric("Lasso (prom. diario)", f"${prom_lasso:.1f}/kWh")
             cc.metric("Aprendizaje residual (prom.)", f"${prom_res:.1f}/kWh")
+            _mae_lasso = round(lasso_metrics["MAE"], 1)
+            _mae_persist = round(persist_metrics["MAE"], 1)
+            st.caption(
+                f"Margen de error historico del modelo (conjunto de prueba, dic 2022 - mar 2026): "
+                f"Lasso MAE = **{_mae_lasso} $/kWh** | Persistencia MAE = **{_mae_persist} $/kWh**. "
+                f"El precio real puede diferir del pronostico en ese margen aproximado."
+            )
             fig_auto = go.Figure()
             fig_auto.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
                                line_width=0, annotation_text="Franja pico",
