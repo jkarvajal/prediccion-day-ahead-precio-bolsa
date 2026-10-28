@@ -835,6 +835,32 @@ with tab_clima:
             st.caption("Un nivel de embalses más bajo (sequía) tiende a coincidir con "
                        "precios más altos. El dato de embalses está disponible desde 2013.")
 
+        if "oni" in clima_f.columns and "embalse_porcentaje_diario" in clima_f.columns:
+            st.markdown("**Nivel de embalses frente al Índice de El Niño (ONI)**")
+            f_emb_oni = make_subplots(specs=[[{"secondary_y": True}]])
+            f_emb_oni.add_trace(
+                go.Scatter(x=clima_f["FECHA"], y=clima_f["embalse_porcentaje_diario"],
+                           name="Nivel de embalses",
+                           line=dict(color=VERDE, width=2, dash="dot")), secondary_y=False)
+            f_emb_oni.add_trace(
+                go.Scatter(x=clima_f["FECHA"], y=clima_f["oni"],
+                           name="Índice ONI (El Niño)",
+                           line=dict(color=NARANJA, width=2)), secondary_y=True)
+            # Linea de referencia ONI=0 (separa El Nino de La Nina)
+            f_emb_oni.add_trace(
+                go.Scatter(x=[clima_f["FECHA"].min(), clima_f["FECHA"].max()],
+                           y=[0, 0], mode="lines", showlegend=False,
+                           line=dict(color=COLOR_REAL, width=1, dash="dot")),
+                secondary_y=True)
+            f_emb_oni.update_yaxes(title_text="Nivel de embalses", secondary_y=False)
+            f_emb_oni.update_yaxes(title_text="ONI", secondary_y=True)
+            f_emb_oni.update_layout(xaxis_title="Fecha", hovermode="x unified", legend=leyenda)
+            st.plotly_chart(estilo_grafico(f_emb_oni, PLANTILLA, 380), use_container_width=True)
+            st.caption("La relación inversa entre embalses y ONI refleja el efecto de "
+                       "El Niño sobre la hidrología del SIN: episodios de ONI positivo "
+                       "suelen reducir las precipitaciones y con ello el nivel de embalses. "
+                       "La línea punteada marca ONI = 0 (frontera El Niño / La Niña).")
+
         def grafico_dispersion(x_col, x_titulo, color):
             """Dispersión de la exógena frente al precio sobre todo el histórico, con línea
             de tendencia (mínimos cuadrados) y el coeficiente de correlación."""
