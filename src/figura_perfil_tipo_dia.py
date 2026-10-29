@@ -5,8 +5,9 @@ de dia (habil, sabado, domingo, festivo), capitulo 2. Sustenta la afirmacion de
 que los dias habiles muestran el perfil mas pronunciado y los domingos y
 festivos uno mas bajo y aplanado.
 
-Datos: data/processed/features_day_ahead.csv (columnas h00..h23 y base_tipo_dia),
-la misma fuente que consume el dashboard.
+Datos: data/outputs/eda_perfil_horario_por_tipo_dia.csv, el output del Bloque 13
+("Perfil horario por tipo de dia") de notebooks/02_eda.ipynb. No se recalcula aqui;
+solo se grafica el resultado ya producido por el codigo del EDA.
 """
 
 from pathlib import Path
@@ -19,11 +20,10 @@ import matplotlib.patches as mpatches
 import pandas as pd
 
 RAIZ = Path(__file__).resolve().parents[1]
-FEATURES = RAIZ / "data" / "processed" / "features_day_ahead.csv"
+PERFIL_CSV = RAIZ / "data" / "outputs" / "eda_perfil_horario_por_tipo_dia.csv"
 FIGURAS_DIR = RAIZ / "reports" / "figures"
 MEDIA_LATEX = Path(r"D:\Claude\Paper Latex\workspace\media")
 
-HOUR_COLS = [f"h{h:02d}" for h in range(24)]
 PICO_INI, PICO_FIN = 17.5, 21.5
 
 # Un color por tipo de dia; el habil se resalta (mas grueso).
@@ -36,8 +36,8 @@ ESTILOS = {
 
 
 def generar() -> Path:
-    df = pd.read_csv(FEATURES, usecols=["base_tipo_dia"] + HOUR_COLS)
-    perfil = df.groupby("base_tipo_dia")[HOUR_COLS].mean()
+    df = pd.read_csv(PERFIL_CSV)
+    perfil = df.pivot(index="tipo_dia", columns="hora", values="precio_promedio")
     horas = list(range(24))
 
     fig, ax = plt.subplots(figsize=(10, 4.8))
@@ -45,7 +45,7 @@ def generar() -> Path:
 
     for tipo, (etiqueta, color, estilo, grosor) in ESTILOS.items():
         if tipo in perfil.index:
-            y = [perfil.loc[tipo, c] for c in HOUR_COLS]
+            y = [perfil.loc[tipo, h] for h in range(24)]
             ax.plot(horas, y, color=color, lw=grosor, ls=estilo, marker="o",
                     ms=3.5, label=etiqueta, zorder=3)
 
