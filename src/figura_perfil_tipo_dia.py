@@ -19,6 +19,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import pandas as pd
 
+from config import (COLOR_PRIMARIO, COLOR_SECUNDARIO, COLOR_RESALTADO,
+                    COLOR_CUATERNARIO, BANDA_PICO)
+
 RAIZ = Path(__file__).resolve().parents[1]
 PERFIL_CSV = RAIZ / "data" / "outputs" / "eda_perfil_horario_por_tipo_dia.csv"
 FIGURAS_DIR = RAIZ / "reports" / "figures"
@@ -28,10 +31,10 @@ PICO_INI, PICO_FIN = 17.5, 21.5
 
 # Un color por tipo de dia; el habil se resalta (mas grueso).
 ESTILOS = {
-    "habil":   ("Hábil",   "#6b3fa0", "-",   2.6),
-    "sabado":  ("Sábado",  "#2a9d8f", "-",   2.0),
-    "domingo": ("Domingo", "#e76f51", "--",  2.0),
-    "festivo": ("Festivo", "#577590", "-.",  2.0),
+    "habil":   ("Hábil",   COLOR_PRIMARIO,    "-",   2.6),
+    "sabado":  ("Sábado",  COLOR_SECUNDARIO,  "-",   2.0),
+    "domingo": ("Domingo", COLOR_RESALTADO,   "--",  2.0),
+    "festivo": ("Festivo", COLOR_CUATERNARIO, "-.",  2.0),
 }
 
 
@@ -41,7 +44,7 @@ def generar() -> Path:
     horas = list(range(24))
 
     fig, ax = plt.subplots(figsize=(10, 4.8))
-    ax.axvspan(PICO_INI, PICO_FIN, color="crimson", alpha=0.07, zorder=0)
+    ax.axvspan(PICO_INI, PICO_FIN, color=BANDA_PICO, alpha=0.15, zorder=0)
 
     for tipo, (etiqueta, color, estilo, grosor) in ESTILOS.items():
         if tipo in perfil.index:
@@ -56,7 +59,7 @@ def generar() -> Path:
     ax.grid(alpha=0.3)
 
     handles, labels = ax.get_legend_handles_labels()
-    handles.append(mpatches.Patch(color="crimson", alpha=0.12))
+    handles.append(mpatches.Patch(color=BANDA_PICO, alpha=0.15))
     labels.append("Franja pico (18 a 21 h)")
     ax.legend(handles, labels, fontsize=8.5, ncol=3, loc="upper left")
 

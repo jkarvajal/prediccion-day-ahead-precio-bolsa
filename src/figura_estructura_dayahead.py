@@ -21,13 +21,15 @@ RAIZ = Path(__file__).resolve().parents[1]
 FIGURAS_DIR = RAIZ / "reports" / "figures"
 MEDIA_LATEX = Path(r"D:\Claude\Paper Latex\workspace\media")
 
-# Paleta general del documento.
-MORADO = "#6b3fa0"
-TEAL = "#2a9d8f"
-MORADO_CLARO = "#efe9f6"
-TEAL_CLARO = "#e1f1ef"
+# Paleta Okabe-Ito: azul para predictoras, verde para objetivos, bermellon para
+# el corte cronologico.
+MORADO = "#0072B2"
+TEAL = "#009E73"
+MORADO_CLARO = "#dcebf5"
+TEAL_CLARO = "#d7efe7"
 GRIS = "#444444"
 GRIS_CLARO = "#8a8a8a"
+BERMELLON = "#D55E00"
 
 
 def _caja(ax, x, y, w, h, color_borde, color_relleno):
@@ -69,11 +71,11 @@ def generar() -> Path:
                 fontsize=8.6, color="#2b2b2b")
 
     # --- Corte cronologico en D ---
-    ax.plot([5.5, 5.5], [0.75, 5.55], ls="--", lw=1.8, color="crimson", zorder=3)
+    ax.plot([5.5, 5.5], [0.75, 5.55], ls="--", lw=1.8, color=BERMELLON, zorder=3)
     ax.text(5.5, 5.75, "Corte cronológico", ha="center", va="center",
-            fontsize=9.5, fontweight="bold", color="crimson")
+            fontsize=9.5, fontweight="bold", color=BERMELLON)
     ax.text(5.0, 0.18, "ninguna predictora usa información posterior a D",
-            ha="center", va="center", fontsize=8.2, color="crimson",
+            ha="center", va="center", fontsize=8.2, color=BERMELLON,
             style="italic")
 
     # --- Bloque de objetivos (dia siguiente D+1) ---
