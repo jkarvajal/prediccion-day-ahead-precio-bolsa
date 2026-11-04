@@ -44,6 +44,7 @@ OUTPUTS_DIR = ROOT / "data" / "outputs"
 MODEL_LASSO_PATH = MODELS_DIR / "modelo_final_dayahead.joblib"
 MODEL_RESIDUAL_PATH = MODELS_DIR / "modelo_residual_dayahead.joblib"
 SALIDA = OUTPUTS_DIR / "prediccion_automatica.csv"
+SALIDA_VERIF = OUTPUTS_DIR / "prediccion_verificacion.csv"
 
 DIAS_HISTORIAL = 35  # dias hacia atras para calcular rezagos y EWMA
 
@@ -160,6 +161,38 @@ def main():
 
     print(f"\nPrediccion para {fecha_objetivo} (base: {fecha_base}):")
     print(salida[["hora", "persistencia", "lasso", "residual"]].to_string(index=False))
+
+    # -----------------------------------------------------------------------
+    # Verificacion: pronostico frente al precio real observado.
+    # El pronostico automatico es day-ahead, asi que su dia objetivo aun no tiene
+    # precio real. Para poder comparar contra la realidad se genera, en paralelo,
+    # un pronostico usando como base el penultimo dia disponible: su objetivo es el
+    # ultimo dia disponible (fecha_base), que SI tiene precio real. Este archivo es
+    # el que alimenta la grafica de "pronostico vs. real" del dashboard.
+    # -----------------------------------------------------------------------
+    try:
+        verif_base = fecha_base - timedelta(days=1)
+        fila_v = construir_fila(verif_base, precios_df, embalse_serie, oni_serie)
+        v_persist = [float(fila_v.get(f"h{h:02d}", float("nan"))) for h in range(24)]
+        v_lasso = (_predict_lasso(joblib.load(MODEL_LASSO_PATH), fila_v)
+                   if MODEL_LASSO_PATH.exists() else [float("nan")] * 24)
+        v_residual = (_predict_residual(joblib.load(MODEL_RESIDUAL_PATH), fila_v)
+                      if MODEL_RESIDUAL_PATH.exists() else [float("nan")] * 24)
+        real_row = precios_df[precios_df["FECHA"].dt.date == fecha_base].iloc[0]
+        v_real = [float(real_row.get(f"h{h:02d}", float("nan"))) for h in range(24)]
+        verif = pd.DataFrame({
+            "fecha_base": str(verif_base),
+            "fecha_objetivo": str(fecha_base),
+            "hora": list(range(24)),
+            "persistencia": [round(p, 2) for p in v_persist],
+            "lasso": [round(p, 2) for p in v_lasso],
+            "residual": [round(p, 2) for p in v_residual],
+            "real": [round(p, 2) for p in v_real],
+        })
+        verif.to_csv(SALIDA_VERIF, index=False, encoding="utf-8")
+        log.info("Verificacion guardada: %s (objetivo %s con precio real)", SALIDA_VERIF, fecha_base)
+    except Exception as exc:
+        log.warning("No se pudo generar la verificacion: %s", exc)
 
 
 if __name__ == "__main__":

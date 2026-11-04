@@ -44,6 +44,7 @@ BASELINE_HOURLY_PATH = OUTPUTS_DIR / "baseline_hourly_results.csv"
 REGIMEN_PATH = OUTPUTS_DIR / "consolidado_por_regimen.csv"
 INTERVALOS_PATH = OUTPUTS_DIR / "intervalos_conformales.csv"
 PREDICCION_AUTO_PATH = OUTPUTS_DIR / "prediccion_automatica.csv"
+PREDICCION_VERIF_PATH = OUTPUTS_DIR / "prediccion_verificacion.csv"
 
 PEAK_HOURS = [18, 19, 20, 21, 22]
 TARGET_COLS = [f"target_h{h:02d}" for h in range(24)]
@@ -214,6 +215,27 @@ def load_prediccion_auto():
     # Mostrar si la prediccion tiene como maximo 5 dias de diferencia con hoy
     # (el pipeline de XM tiene un rezago de hasta 3 dias en la disponibilidad de datos)
     if abs((fecha_obj - _date.today()).days) > 5:
+        return None
+    return df
+
+
+@st.cache_data(ttl=3600)
+def load_verificacion():
+    """
+    Carga la verificacion del pipeline: pronostico frente al precio real observado
+    del ultimo dia con datos disponibles. Retorna None si el archivo no existe, no
+    trae la columna 'real', o el dia objetivo tiene mas de 15 dias de antiguedad.
+    """
+    if not PREDICCION_VERIF_PATH.exists():
+        return None
+    df = pd.read_csv(PREDICCION_VERIF_PATH)
+    if df.empty or "real" not in df.columns or "fecha_objetivo" not in df.columns:
+        return None
+    if df["real"].isna().all():
+        return None
+    fecha_obj = pd.to_datetime(df["fecha_objetivo"].iloc[0]).date()
+    from datetime import date as _date  # noqa: PLC0415
+    if abs((fecha_obj - _date.today()).days) > 15:
         return None
     return df
 
@@ -959,6 +981,58 @@ with tab_carga:
             fig_auto = estilo_grafico(fig_auto, PLANTILLA, 300)
             fig_auto.update_layout(margin=dict(t=30, b=40))
             st.plotly_chart(fig_auto, use_container_width=True)
+        st.divider()
+
+    # --- Verificacion: pronostico frente al precio real observado ---
+    # El banner de arriba es day-ahead (su dia objetivo aun no tiene precio real).
+    # Este bloque muestra el ultimo dia que SI tiene precio real, para comparar el
+    # pronostico del modelo contra lo que realmente ocurrio.
+    verif = load_verificacion()
+    if verif is not None:
+        v_obj = pd.to_datetime(verif["fecha_objetivo"].iloc[0]).date()
+        st.subheader("Verificación: pronóstico frente al precio real")
+        st.caption(
+            f"Último día con precio real disponible: {fecha_larga_es(v_obj)}. Compara lo "
+            "que el modelo habría pronosticado (con los datos del día anterior) contra lo "
+            "que efectivamente ocurrió."
+        )
+        with st.container(border=True):
+            horas_v = verif["hora"].tolist()
+            reales_v = verif["real"].to_numpy(dtype=float)
+
+            def _mae_v(col):
+                p = verif[col].to_numpy(dtype=float)
+                m = ~(np.isnan(p) | np.isnan(reales_v))
+                return float(np.mean(np.abs(p[m] - reales_v[m]))) if m.any() else float("nan")
+
+            mv1, mv2, mv3 = st.columns(3)
+            mv1.metric("Error Persistencia (MAE)", f"${_mae_v('persistencia'):.1f}/kWh")
+            mv2.metric("Error Lasso (MAE)", f"${_mae_v('lasso'):.1f}/kWh")
+            mv3.metric("Error Ap. residual (MAE)", f"${_mae_v('residual'):.1f}/kWh")
+            fig_v = go.Figure()
+            fig_v.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
+                            line_width=0, annotation_text="Franja pico",
+                            annotation_position="top left")
+            fig_v.add_trace(go.Scatter(x=horas_v, y=verif["persistencia"].tolist(),
+                                       mode="lines+markers", name="Persistencia",
+                                       line=dict(color=AZUL, width=3), marker=dict(size=6)))
+            fig_v.add_trace(go.Scatter(x=horas_v, y=verif["lasso"].tolist(),
+                                       mode="lines+markers", name="Lasso",
+                                       line=dict(color=VERDE, width=2), marker=dict(size=5)))
+            fig_v.add_trace(go.Scatter(x=horas_v, y=verif["residual"].tolist(),
+                                       mode="lines+markers", name="Aprendizaje residual",
+                                       line=dict(color=NARANJA, width=2), marker=dict(size=5)))
+            fig_v.add_trace(go.Scatter(x=horas_v, y=verif["real"].tolist(),
+                                       mode="lines+markers", name="Precio real observado",
+                                       line=dict(color=COLOR_REAL, width=2, dash="dot"),
+                                       marker=dict(size=6)))
+            fig_v.update_layout(
+                xaxis_title="Hora del día", yaxis_title="Precio ($/kWh)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            fig_v = estilo_grafico(fig_v, PLANTILLA, 320)
+            fig_v.update_layout(margin=dict(t=30, b=40))
+            st.plotly_chart(fig_v, use_container_width=True)
         st.divider()
 
     st.subheader("Genera un pronóstico con tus propios datos")
