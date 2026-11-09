@@ -818,12 +818,12 @@ with tab_expl:
         fig_iqr = go.Figure()
         fig_iqr.add_trace(go.Scatter(
             x=_horas + _horas[::-1], y=_q3 + _q1[::-1],
-            fill="toself", fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.18)",
+            fill="toself", fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.12)",
             line=dict(width=0), name="Banda Q1-Q3", hoverinfo="skip",
         ))
         fig_iqr.add_trace(go.Scatter(
             x=_horas, y=_q3, mode="lines",
-            line=dict(color=AZUL, width=1.5, dash="dot"), name="Q3 (p75)",
+            line=dict(color=NARANJA, width=1.8, dash="dot"), name="Q3 (p75)",
             hovertemplate="Hora %{x}h — Q3: $%{y:.1f}<extra></extra>",
         ))
         fig_iqr.add_trace(go.Scatter(
@@ -833,13 +833,13 @@ with tab_expl:
         ))
         fig_iqr.add_trace(go.Scatter(
             x=_horas, y=_q1, mode="lines",
-            line=dict(color=AZUL, width=1.5, dash="dot"), name="Q1 (p25)",
+            line=dict(color=VERDE, width=1.8, dash="dot"), name="Q1 (p25)",
             hovertemplate="Hora %{x}h — Q1: $%{y:.1f}<extra></extra>",
         ))
         fig_iqr.update_layout(
             xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
             yaxis_title="Precio de bolsa ($/kWh)",
-            legend=dict(orientation="v", yanchor="bottom", y=0, xanchor="right", x=1),
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
             hovermode="x unified",
         )
         st.plotly_chart(estilo_grafico(fig_iqr, PLANTILLA, 420), use_container_width=True)
@@ -959,6 +959,43 @@ with tab_expl:
             hovermode="x unified",
         )
         st.plotly_chart(estilo_grafico(fig_std, PLANTILLA, 420), use_container_width=True)
+
+        # --- 7. Histograma de precio por hora ---
+        st.markdown("**7. Histograma de frecuencias por hora**")
+        st.caption("Distribución de precios para cada hora del día. Las barras muestran con qué frecuencia el precio cayó en cada rango.")
+        _hora_hist = st.select_slider(
+            "Selecciona una hora para ver su histograma:",
+            options=sorted(larga_agg["hora"].unique().tolist()),
+            value=12,
+            key="hora_hist_sel",
+        )
+        _datos_hora = larga_agg[larga_agg["hora"] == _hora_hist]["precio"]
+        fig_hist = go.Figure()
+        fig_hist.add_trace(go.Histogram(
+            x=_datos_hora,
+            nbinsx=40,
+            marker_color=AZUL,
+            marker_line=dict(color="white", width=0.5),
+            opacity=0.85,
+            name=f"Hora {_hora_hist}h",
+            hovertemplate="$%{x:.0f}/kWh — %{y} días<extra></extra>",
+        ))
+        _p25 = float(_datos_hora.quantile(0.25))
+        _p50 = float(_datos_hora.quantile(0.50))
+        _p75 = float(_datos_hora.quantile(0.75))
+        for _val, _lbl, _col in [(_p25, "Q1", VERDE), (_p50, "Mediana", AZUL), (_p75, "Q3", NARANJA)]:
+            fig_hist.add_vline(
+                x=_val, line_dash="dash", line_color=_col, line_width=1.8,
+                annotation_text=_lbl, annotation_position="top",
+                annotation_font_color=_col,
+            )
+        fig_hist.update_layout(
+            xaxis_title="Precio de bolsa ($/kWh)",
+            yaxis_title="Número de días",
+            showlegend=False,
+            bargap=0.05,
+        )
+        st.plotly_chart(estilo_grafico(fig_hist, PLANTILLA, 400), use_container_width=True)
 
     # ------------------------------------------------------------------ #
     # Sub-pestaña: Tipo de día
