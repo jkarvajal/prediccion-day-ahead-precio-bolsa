@@ -1025,8 +1025,45 @@ with tab_expl:
                 "Hábil": AZUL, "Sábado": VERDE, "Domingo": NARANJA, "Festivo": "#8b5cf6"
             }
 
-            # --- 1. Rango completo (boxplot) ---
-            st.markdown("**1. Rango completo por tipo de día**")
+            # --- 1. Rango intercuartílico por tipo de día ---
+            st.markdown("**1. Rango intercuartílico por tipo de día (Q1, mediana, Q3)**")
+            st.caption("Vista del 50 % central del precio para cada tipo de jornada. La banda sombreada va de Q1 a Q3.")
+            fig_td_iqr = go.Figure()
+            for _td in _tipos_pres:
+                _row_iqr = _stats_tipo[_stats_tipo["Tipo de día"] == _td].iloc[0]
+                _c = _colores_tipo.get(_td, AZUL)
+                _r2, _g2, _b2 = int(_c[1:3], 16), int(_c[3:5], 16), int(_c[5:7], 16)
+                fig_td_iqr.add_trace(go.Scatter(
+                    x=[_td, _td], y=[_row_iqr["q1"], _row_iqr["q3"]],
+                    mode="lines", line=dict(color=_c, width=8),
+                    opacity=0.25, showlegend=False, hoverinfo="skip",
+                ))
+                fig_td_iqr.add_trace(go.Scatter(
+                    x=[_td], y=[_row_iqr["q3"]], mode="markers",
+                    marker=dict(color=_c, size=10, symbol="line-ew", line=dict(color=_c, width=2)),
+                    name=f"Q3 — {_td}", showlegend=False,
+                    hovertemplate=f"{_td} — Q3: $%{{y:.1f}}<extra></extra>",
+                ))
+                fig_td_iqr.add_trace(go.Scatter(
+                    x=[_td], y=[_row_iqr["mediana"]], mode="markers",
+                    marker=dict(color=_c, size=14, symbol="diamond"),
+                    name=_td,
+                    hovertemplate=f"{_td} — Mediana: $%{{y:.1f}}<extra></extra>",
+                ))
+                fig_td_iqr.add_trace(go.Scatter(
+                    x=[_td], y=[_row_iqr["q1"]], mode="markers",
+                    marker=dict(color=_c, size=10, symbol="line-ew", line=dict(color=_c, width=2)),
+                    name=f"Q1 — {_td}", showlegend=False,
+                    hovertemplate=f"{_td} — Q1: $%{{y:.1f}}<extra></extra>",
+                ))
+            fig_td_iqr.update_layout(
+                xaxis_title="Tipo de día", yaxis_title="Precio de bolsa ($/kWh)",
+                legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            )
+            st.plotly_chart(estilo_grafico(fig_td_iqr, PLANTILLA, 420), use_container_width=True)
+
+            # --- 2. Rango completo (boxplot) ---
+            st.markdown("**2. Rango completo por tipo de día**")
             st.caption("Bigotes = mínimo y máximo histórico real. La caja abarca Q1–Q3 y la línea interior es la mediana.")
             fig_td_box = go.Figure()
             for _, _row in _stats_tipo.iterrows():
@@ -1043,8 +1080,8 @@ with tab_expl:
             fig_td_box.update_layout(xaxis_title="Tipo de día", yaxis_title="Precio de bolsa ($/kWh)")
             st.plotly_chart(estilo_grafico(fig_td_box, PLANTILLA, 420), use_container_width=True)
 
-            # --- 2. Violín por tipo de día ---
-            st.markdown("**2. Distribución por densidad (violín)**")
+            # --- 3. Violín por tipo de día ---
+            st.markdown("**3. Distribución por densidad (violín)**")
             st.caption("Muestra la forma completa de la distribución del precio para cada tipo de día.")
             _larga_tipo = larga[larga["FECHA"].isin(larga_agg["FECHA"])].copy() if "FECHA" in larga.columns else larga.copy()
             _larga_tipo["Tipo de día"] = _larga_tipo["base_tipo_dia"].map(TIPO_DIA_ES).fillna(_larga_tipo["base_tipo_dia"]) if "base_tipo_dia" in _larga_tipo.columns else None
@@ -1061,8 +1098,8 @@ with tab_expl:
                 fig_td_vio.update_layout(showlegend=False)
                 st.plotly_chart(estilo_grafico(fig_td_vio, PLANTILLA, 420), use_container_width=True)
 
-            # --- 3. Media y mediana por tipo de día (barras) ---
-            st.markdown("**3. Media y mediana por tipo de día**")
+            # --- 4. Media y mediana por tipo de día (barras) ---
+            st.markdown("**4. Media y mediana por tipo de día**")
             st.caption("Comparación directa entre la media aritmética (sensible a extremos) y la mediana (valor central).")
             fig_td_bar = go.Figure()
             fig_td_bar.add_trace(go.Bar(
@@ -1082,8 +1119,8 @@ with tab_expl:
             )
             st.plotly_chart(estilo_grafico(fig_td_bar, PLANTILLA, 400), use_container_width=True)
 
-            # --- 4. Perfil horario por tipo de día ---
-            st.markdown("**4. Perfil horario por tipo de día (mediana)**")
+            # --- 5. Perfil horario por tipo de día ---
+            st.markdown("**5. Perfil horario por tipo de día (mediana)**")
             st.caption("Mediana del precio a lo largo del día para cada tipo de jornada.")
             _perfil_td = (
                 larga_agg.groupby(["Tipo de día", "hora"])["precio"]
@@ -1128,35 +1165,14 @@ with tab_expl:
         )
         _stats_mes["mes_nombre"] = _stats_mes["mes"].map(_meses_nombre)
 
-        # --- 1. Rango completo por mes (boxplot) ---
-        st.markdown("**1. Rango completo por mes**")
-        st.caption("Distribución del precio para cada mes. Bigotes = mínimo y máximo histórico real.")
-        fig_mes_box = go.Figure()
-        for _, _row in _stats_mes.iterrows():
-            fig_mes_box.add_trace(go.Box(
-                x=[_row["mes_nombre"]],
-                q1=[_row["q1"]], median=[_row["mediana"]], q3=[_row["q3"]],
-                lowerfence=[_row["minimo"]], upperfence=[_row["maximo"]],
-                name="", showlegend=False, whiskerwidth=0.6,
-                marker_color=AZUL, line_color=AZUL,
-                fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.25)",
-            ))
-        fig_mes_box.update_layout(
-            xaxis=dict(title="Mes", categoryorder="array",
-                       categoryarray=list(_meses_nombre.values())),
-            yaxis_title="Precio de bolsa ($/kWh)",
-        )
-        st.plotly_chart(estilo_grafico(fig_mes_box, PLANTILLA, 420), use_container_width=True)
-
-        # --- 2. Banda IQR mensual ---
-        st.markdown("**2. Rango intercuartílico mensual (Q1, mediana, Q3)**")
+        # --- 1. Banda IQR mensual ---
+        st.markdown("**1. Rango intercuartílico mensual (Q1, mediana, Q3)**")
         st.caption("Vista del 50 % central del precio por mes del año.")
         _meses_ord = list(_meses_nombre.values())
         _sm = _stats_mes.set_index("mes_nombre").reindex(_meses_ord).reset_index()
         _sm_q1  = _sm["q1"].tolist()
         _sm_q3  = _sm["q3"].tolist()
         _sm_med = _sm["mediana"].tolist()
-        _idx_mes = list(range(len(_meses_ord)))
         fig_mes_iqr = go.Figure()
         fig_mes_iqr.add_trace(go.Scatter(
             x=_meses_ord + _meses_ord[::-1], y=_sm_q3 + _sm_q1[::-1],
@@ -1185,6 +1201,26 @@ with tab_expl:
             hovermode="x unified",
         )
         st.plotly_chart(estilo_grafico(fig_mes_iqr, PLANTILLA, 420), use_container_width=True)
+
+        # --- 2. Rango completo por mes (boxplot) ---
+        st.markdown("**2. Rango completo por mes**")
+        st.caption("Distribución del precio para cada mes. Bigotes = mínimo y máximo histórico real.")
+        fig_mes_box = go.Figure()
+        for _, _row in _stats_mes.iterrows():
+            fig_mes_box.add_trace(go.Box(
+                x=[_row["mes_nombre"]],
+                q1=[_row["q1"]], median=[_row["mediana"]], q3=[_row["q3"]],
+                lowerfence=[_row["minimo"]], upperfence=[_row["maximo"]],
+                name="", showlegend=False, whiskerwidth=0.6,
+                marker_color=AZUL, line_color=AZUL,
+                fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.25)",
+            ))
+        fig_mes_box.update_layout(
+            xaxis=dict(title="Mes", categoryorder="array",
+                       categoryarray=list(_meses_nombre.values())),
+            yaxis_title="Precio de bolsa ($/kWh)",
+        )
+        st.plotly_chart(estilo_grafico(fig_mes_box, PLANTILLA, 420), use_container_width=True)
 
         # --- 3. Mapa de calor mes × hora ---
         st.markdown("**3. Mapa de calor: precio promedio por mes y hora**")
@@ -1257,51 +1293,8 @@ with tab_expl:
         )
         _años_ord = _stats_año["año"].tolist()
 
-        # --- 1. Rango completo por año (boxplot) ---
-        st.markdown("**1. Rango completo por año**")
-        st.caption("Distribución anual del precio. Bigotes = mínimo y máximo histórico real.")
-        fig_año_box = go.Figure()
-        for _, _row in _stats_año.iterrows():
-            fig_año_box.add_trace(go.Box(
-                x=[int(_row["año"])],
-                q1=[_row["q1"]], median=[_row["mediana"]], q3=[_row["q3"]],
-                lowerfence=[_row["minimo"]], upperfence=[_row["maximo"]],
-                name="", showlegend=False, whiskerwidth=0.6,
-                marker_color=NARANJA, line_color=NARANJA,
-                fillcolor=f"rgba({_narj_r},{_narj_g},{_narj_b},0.25)",
-            ))
-        fig_año_box.update_layout(
-            xaxis=dict(title="Año", tickmode="linear", dtick=1),
-            yaxis_title="Precio de bolsa ($/kWh)",
-        )
-        st.plotly_chart(estilo_grafico(fig_año_box, PLANTILLA, 420), use_container_width=True)
-
-        # --- 2. Evolución anual: media y mediana ---
-        st.markdown("**2. Evolución anual de media y mediana**")
-        st.caption("Tendencia del nivel de precios año a año. La diferencia entre media y mediana indica la presencia de valores extremos.")
-        fig_año_line = go.Figure()
-        fig_año_line.add_trace(go.Scatter(
-            x=_años_ord, y=_stats_año["media"].tolist(),
-            mode="lines+markers", name="Media",
-            line=dict(color=AZUL, width=2), marker=dict(size=6),
-            hovertemplate="Año %{x} — Media: $%{y:.1f}<extra></extra>",
-        ))
-        fig_año_line.add_trace(go.Scatter(
-            x=_años_ord, y=_stats_año["mediana"].tolist(),
-            mode="lines+markers", name="Mediana",
-            line=dict(color=VERDE, width=2, dash="dot"), marker=dict(size=6),
-            hovertemplate="Año %{x} — Mediana: $%{y:.1f}<extra></extra>",
-        ))
-        fig_año_line.update_layout(
-            xaxis=dict(title="Año", tickmode="linear", dtick=1),
-            yaxis_title="Precio de bolsa ($/kWh)",
-            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
-            hovermode="x unified",
-        )
-        st.plotly_chart(estilo_grafico(fig_año_line, PLANTILLA, 400), use_container_width=True)
-
-        # --- 3. Banda IQR anual ---
-        st.markdown("**3. Rango intercuartílico anual (Q1, mediana, Q3)**")
+        # --- 1. Banda IQR anual ---
+        st.markdown("**1. Rango intercuartílico anual (Q1, mediana, Q3)**")
         st.caption("Evolución del 50 % central del precio a lo largo de los años.")
         _sa_q1  = _stats_año["q1"].tolist()
         _sa_q3  = _stats_año["q3"].tolist()
@@ -1334,6 +1327,49 @@ with tab_expl:
             hovermode="x unified",
         )
         st.plotly_chart(estilo_grafico(fig_año_iqr, PLANTILLA, 420), use_container_width=True)
+
+        # --- 2. Rango completo por año (boxplot) ---
+        st.markdown("**2. Rango completo por año**")
+        st.caption("Distribución anual del precio. Bigotes = mínimo y máximo histórico real.")
+        fig_año_box = go.Figure()
+        for _, _row in _stats_año.iterrows():
+            fig_año_box.add_trace(go.Box(
+                x=[int(_row["año"])],
+                q1=[_row["q1"]], median=[_row["mediana"]], q3=[_row["q3"]],
+                lowerfence=[_row["minimo"]], upperfence=[_row["maximo"]],
+                name="", showlegend=False, whiskerwidth=0.6,
+                marker_color=NARANJA, line_color=NARANJA,
+                fillcolor=f"rgba({_narj_r},{_narj_g},{_narj_b},0.25)",
+            ))
+        fig_año_box.update_layout(
+            xaxis=dict(title="Año", tickmode="linear", dtick=1),
+            yaxis_title="Precio de bolsa ($/kWh)",
+        )
+        st.plotly_chart(estilo_grafico(fig_año_box, PLANTILLA, 420), use_container_width=True)
+
+        # --- 3. Evolución anual: media y mediana ---
+        st.markdown("**3. Evolución anual de media y mediana**")
+        st.caption("Tendencia del nivel de precios año a año. La diferencia entre media y mediana indica la presencia de valores extremos.")
+        fig_año_line = go.Figure()
+        fig_año_line.add_trace(go.Scatter(
+            x=_años_ord, y=_stats_año["media"].tolist(),
+            mode="lines+markers", name="Media",
+            line=dict(color=AZUL, width=2), marker=dict(size=6),
+            hovertemplate="Año %{x} — Media: $%{y:.1f}<extra></extra>",
+        ))
+        fig_año_line.add_trace(go.Scatter(
+            x=_años_ord, y=_stats_año["mediana"].tolist(),
+            mode="lines+markers", name="Mediana",
+            line=dict(color=VERDE, width=2, dash="dot"), marker=dict(size=6),
+            hovertemplate="Año %{x} — Mediana: $%{y:.1f}<extra></extra>",
+        ))
+        fig_año_line.update_layout(
+            xaxis=dict(title="Año", tickmode="linear", dtick=1),
+            yaxis_title="Precio de bolsa ($/kWh)",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
+        )
+        st.plotly_chart(estilo_grafico(fig_año_line, PLANTILLA, 400), use_container_width=True)
 
         # --- 4. Perfil horario por año (mapa de calor) ---
         st.markdown("**4. Mapa de calor: precio promedio por año y hora**")
