@@ -743,6 +743,52 @@ with tab_expl:
     st.caption("Los bigotes llegan hasta 1.5 veces el rango intercuartílico. "
                "Los valores individuales más extremos se omiten para no distorsionar la escala.")
 
+    with st.expander("Alternativas de visualización (comparar con el boxplot)"):
+        st.caption("Cuatro alternativas para evaluar cuál muestra mejor la distribución del precio por hora.")
+        alt1, alt2 = st.columns(2)
+        with alt1:
+            st.markdown("**Histograma**")
+            fig_hist = px.histogram(
+                larga, x="precio", nbins=80,
+                labels={"precio": "Precio de bolsa ($/kWh)"},
+                color_discrete_sequence=[AZUL])
+            st.plotly_chart(estilo_grafico(fig_hist, PLANTILLA, 320), use_container_width=True)
+        with alt2:
+            st.markdown("**Gráfico de violín**")
+            fig_vio = px.violin(
+                larga, x="hora", y="precio", points=False,
+                labels={"hora": "Hora del día", "precio": "Precio de bolsa ($/kWh)"},
+                color_discrete_sequence=[AZUL])
+            st.plotly_chart(estilo_grafico(fig_vio, PLANTILLA, 320), use_container_width=True)
+
+        alt3, alt4 = st.columns(2)
+        with alt3:
+            st.markdown("**Distribución acumulada (ECDF) por franja horaria**")
+            _franja_map = {
+                **{h: "Madrugada (0-5 h)" for h in range(6)},
+                **{h: "Mañana (6-11 h)" for h in range(6, 12)},
+                **{h: "Tarde (12-17 h)" for h in range(12, 18)},
+                **{h: "Pico (18-22 h)" for h in range(18, 23)},
+                23: "Noche (23 h)",
+            }
+            larga_ecdf = larga.copy()
+            larga_ecdf["Franja"] = larga_ecdf["hora"].map(_franja_map)
+            _orden_franja = ["Madrugada (0-5 h)", "Mañana (6-11 h)",
+                             "Tarde (12-17 h)", "Pico (18-22 h)", "Noche (23 h)"]
+            fig_ecdf = px.ecdf(
+                larga_ecdf, x="precio", color="Franja",
+                category_orders={"Franja": _orden_franja},
+                labels={"precio": "Precio de bolsa ($/kWh)"},
+                color_discrete_sequence=[AZUL, VERDE, NARANJA, "#a855f7", "#6b7280"])
+            st.plotly_chart(estilo_grafico(fig_ecdf, PLANTILLA, 320), use_container_width=True)
+        with alt4:
+            st.markdown("**Histograma con escala logarítmica (eje Y)**")
+            fig_hist_log = px.histogram(
+                larga, x="precio", nbins=80, log_y=True,
+                labels={"precio": "Precio de bolsa ($/kWh)"},
+                color_discrete_sequence=[AZUL])
+            st.plotly_chart(estilo_grafico(fig_hist_log, PLANTILLA, 320), use_container_width=True)
+
     if "base_tipo_dia" in larga.columns:
         st.markdown("**Distribución del precio por tipo de día**")
         larga["Tipo de día"] = larga["base_tipo_dia"].map(TIPO_DIA_ES).fillna(larga["base_tipo_dia"])
