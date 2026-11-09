@@ -787,15 +787,60 @@ with tab_expl:
     )
     _horas = _stats["hora"].tolist()
 
-    # --- Gráfica A: Comportamiento completo (mín, máx y cuartiles reales) ---
+    _azul_r = int(AZUL[1:3], 16)
+    _azul_g = int(AZUL[3:5], 16)
+    _azul_b = int(AZUL[5:7], 16)
+
+    # --- Gráfica A: Solo cuartiles Q1-Q3 + mediana (arriba) ---
+    st.markdown("**Rango intercuartílico por hora (Q1, mediana y Q3)**")
+    st.caption("Vista enfocada en el 50 % central de los precios. La banda sombreada va de Q1 a Q3.")
+    _q1 = _stats.set_index("hora").loc[_horas, "q1"].tolist()
+    _q3 = _stats.set_index("hora").loc[_horas, "q3"].tolist()
+    _med = _stats.set_index("hora").loc[_horas, "mediana"].tolist()
+
+    fig_iqr = go.Figure()
+    fig_iqr.add_trace(go.Scatter(
+        x=_horas + _horas[::-1],
+        y=_q3 + _q1[::-1],
+        fill="toself",
+        fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.18)",
+        line=dict(width=0),
+        name="Banda Q1-Q3",
+        hoverinfo="skip",
+    ))
+    fig_iqr.add_trace(go.Scatter(
+        x=_horas, y=_q3,
+        mode="lines", line=dict(color=AZUL, width=1.5, dash="dot"),
+        name="Q3 (p75)",
+        hovertemplate="Hora %{x}h — Q3: $%{y:.1f}<extra></extra>",
+    ))
+    fig_iqr.add_trace(go.Scatter(
+        x=_horas, y=_med,
+        mode="lines+markers", line=dict(color=AZUL, width=2.5),
+        marker=dict(size=5),
+        name="Mediana",
+        hovertemplate="Hora %{x}h — Mediana: $%{y:.1f}<extra></extra>",
+    ))
+    fig_iqr.add_trace(go.Scatter(
+        x=_horas, y=_q1,
+        mode="lines", line=dict(color=AZUL, width=1.5, dash="dot"),
+        name="Q1 (p25)",
+        hovertemplate="Hora %{x}h — Q1: $%{y:.1f}<extra></extra>",
+    ))
+    fig_iqr.update_layout(
+        xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+        yaxis_title="Precio de bolsa ($/kWh)",
+        legend=dict(orientation="v", yanchor="bottom", y=0, xanchor="right", x=1),
+        hovermode="x unified",
+    )
+    st.plotly_chart(estilo_grafico(fig_iqr, PLANTILLA, 420), use_container_width=True)
+
+    # --- Gráfica B: Rango completo (mín, máx y cuartiles reales) ---
     st.markdown("**Rango completo: mínimo, máximo y cuartiles por hora**")
     st.caption(
         "Los bigotes muestran el valor **mínimo y máximo histórico real** (no recortados al 1.5×IQR). "
         "La caja abarca el 50 % central (Q1-Q3) y la línea interior es la mediana."
     )
-    _azul_r = int(AZUL[1:3], 16)
-    _azul_g = int(AZUL[3:5], 16)
-    _azul_b = int(AZUL[5:7], 16)
     fig_completo = go.Figure()
     for _, _row in _stats.iterrows():
         fig_completo.add_trace(go.Box(
@@ -817,76 +862,6 @@ with tab_expl:
         yaxis_title="Precio de bolsa ($/kWh)",
     )
     st.plotly_chart(estilo_grafico(fig_completo, PLANTILLA, 420), use_container_width=True)
-
-    # --- Gráfica B: Solo cuartiles Q1-Q3 + mediana ---
-    st.markdown("**Rango intercuartílico por hora (Q1, mediana y Q3)**")
-    st.caption(
-        "Vista enfocada en el 50 % central de los precios. "
-        "La banda sombreada va de Q1 a Q3; los valores máximos y mínimos se anotan en la gráfica."
-    )
-    _q1 = _stats.set_index("hora").loc[_horas, "q1"].tolist()
-    _q3 = _stats.set_index("hora").loc[_horas, "q3"].tolist()
-    _med = _stats.set_index("hora").loc[_horas, "mediana"].tolist()
-    _maxs = _stats.set_index("hora").loc[_horas, "maximo"].tolist()
-    _mins = _stats.set_index("hora").loc[_horas, "minimo"].tolist()
-
-    fig_iqr = go.Figure()
-    # Banda Q1-Q3
-    fig_iqr.add_trace(go.Scatter(
-        x=_horas + _horas[::-1],
-        y=_q3 + _q1[::-1],
-        fill="toself",
-        fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.18)",
-        line=dict(width=0),
-        name="Banda Q1-Q3",
-        hoverinfo="skip",
-    ))
-    # Q3
-    fig_iqr.add_trace(go.Scatter(
-        x=_horas, y=_q3,
-        mode="lines", line=dict(color=AZUL, width=1.5, dash="dot"),
-        name="Q3 (p75)",
-        hovertemplate="Hora %{x}h — Q3: $%{y:.1f}<extra></extra>",
-    ))
-    # Mediana
-    fig_iqr.add_trace(go.Scatter(
-        x=_horas, y=_med,
-        mode="lines+markers", line=dict(color=AZUL, width=2.5),
-        marker=dict(size=5),
-        name="Mediana",
-        hovertemplate="Hora %{x}h — Mediana: $%{y:.1f}<extra></extra>",
-    ))
-    # Q1
-    fig_iqr.add_trace(go.Scatter(
-        x=_horas, y=_q1,
-        mode="lines", line=dict(color=AZUL, width=1.5, dash="dot"),
-        name="Q1 (p25)",
-        hovertemplate="Hora %{x}h — Q1: $%{y:.1f}<extra></extra>",
-    ))
-    # Anotaciones de máx y mín absolutos
-    _idx_max = int(_stats["maximo"].idxmax())
-    _idx_min = int(_stats["minimo"].idxmin())
-    _h_max = int(_stats.loc[_idx_max, "hora"])
-    _h_min = int(_stats.loc[_idx_min, "hora"])
-    fig_iqr.add_annotation(
-        x=_h_max, y=_stats.loc[_idx_max, "q3"],
-        text=f"Máx: ${_stats.loc[_idx_max, 'maximo']:.0f}",
-        showarrow=True, arrowhead=2, yanchor="bottom",
-        font=dict(size=11), ay=-30,
-    )
-    fig_iqr.add_annotation(
-        x=_h_min, y=_stats.loc[_idx_min, "q1"],
-        text=f"Mín: ${_stats.loc[_idx_min, 'minimo']:.0f}",
-        showarrow=True, arrowhead=2, yanchor="top",
-        font=dict(size=11), ay=30,
-    )
-    fig_iqr.update_layout(
-        xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
-        yaxis_title="Precio de bolsa ($/kWh)",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        hovermode="x unified",
-    )
-    st.plotly_chart(estilo_grafico(fig_iqr, PLANTILLA, 420), use_container_width=True)
 
     # --- Distribución por tipo de día ---
     if "base_tipo_dia" in larga.columns:
