@@ -724,80 +724,210 @@ with tab_pred:
 # ======================================================================== #
 with tab_expl:
     st.subheader("Patrones del precio")
-    st.caption("Cada caja resume la distribución del precio: la línea central es la "
-               "mediana y la caja abarca la mitad de los valores. Ayuda a ver en qué "
-               "horas y en qué días el precio es más alto o más disperso.")
 
-    larga = serie_horaria_larga(df)
+    larga_full = serie_horaria_larga(df)
+    larga_full["año"] = pd.to_datetime(larga_full["FECHA"]).dt.year
+    años_disp = sorted(larga_full["año"].unique().tolist())
+
+    # --- Filtro de período ---
+    _fc1, _fc2 = st.columns([1, 2])
+    with _fc1:
+        modo_periodo = st.radio(
+            "Período de análisis:",
+            ["Todo el período", "Por año", "Rango de fechas"],
+            horizontal=False, key="modo_periodo_expl",
+        )
+    with _fc2:
+        if modo_periodo == "Por año":
+            años_sel = st.multiselect(
+                "Selecciona uno o más años:",
+                años_disp, default=años_disp, key="años_expl",
+            )
+            if not años_sel:
+                años_sel = años_disp
+            larga = larga_full[larga_full["año"].isin(años_sel)].copy()
+        elif modo_periodo == "Rango de fechas":
+            import datetime as _dt
+            fecha_min = pd.to_datetime(larga_full["FECHA"]).min().date()
+            fecha_max = pd.to_datetime(larga_full["FECHA"]).max().date()
+            rango = st.date_input(
+                "Desde / Hasta:",
+                value=(fecha_min, fecha_max),
+                min_value=fecha_min, max_value=fecha_max,
+                key="rango_fechas_expl",
+            )
+            if isinstance(rango, (list, tuple)) and len(rango) == 2:
+                f_ini, f_fin = pd.Timestamp(rango[0]), pd.Timestamp(rango[1])
+            else:
+                f_ini, f_fin = pd.Timestamp(fecha_min), pd.Timestamp(fecha_max)
+            larga = larga_full[
+                (pd.to_datetime(larga_full["FECHA"]) >= f_ini) &
+                (pd.to_datetime(larga_full["FECHA"]) <= f_fin)
+            ].copy()
+        else:
+            larga = larga_full.copy()
+
+    n_dias = larga["FECHA"].nunique()
+    st.caption(f"{n_dias:,} días en el período seleccionado.")
+
     if len(larga) > 60000:
         larga = larga.sample(60000, random_state=42)
 
-    st.markdown("**Distribución del precio por hora del día**")
-    # points=False oculta los valores atípicos: así las cajas se agrandan y se comparan
-    # mejor las medianas entre horas.
-    fig_hora = px.box(larga, x="hora", y="precio", points=False,
-                      labels={"hora": "Hora del día", "precio": "Precio de bolsa ($/kWh)"},
-                      color_discrete_sequence=[AZUL])
-    fig_hora.update_traces(whiskerwidth=0.5)
-    st.plotly_chart(estilo_grafico(fig_hora, PLANTILLA, 400), use_container_width=True)
-    st.caption("Los bigotes llegan hasta 1.5 veces el rango intercuartílico. "
-               "Los valores individuales más extremos se omiten para no distorsionar la escala.")
+    # Estadísticas por hora (usando datos completos antes del sampleo)
+    _stats = (
+        larga.groupby("hora")["precio"]
+        .agg(
+            q1=lambda x: float(x.quantile(0.25)),
+            mediana="median",
+            q3=lambda x: float(x.quantile(0.75)),
+            minimo="min",
+            maximo="max",
+        )
+        .reset_index()
+    )
+    _horas = _stats["hora"].tolist()
 
-    with st.expander("Alternativas de visualización (comparar con el boxplot)"):
-        st.caption("Cuatro alternativas para evaluar cuál muestra mejor la distribución del precio por hora.")
-        alt1, alt2 = st.columns(2)
-        with alt1:
-            st.markdown("**Histograma**")
-            fig_hist = px.histogram(
-                larga, x="precio", nbins=80,
-                labels={"precio": "Precio de bolsa ($/kWh)"},
-                color_discrete_sequence=[AZUL])
-            st.plotly_chart(estilo_grafico(fig_hist, PLANTILLA, 320), use_container_width=True)
-        with alt2:
-            st.markdown("**Gráfico de violín**")
-            fig_vio = px.violin(
-                larga, x="hora", y="precio", points=False,
-                labels={"hora": "Hora del día", "precio": "Precio de bolsa ($/kWh)"},
-                color_discrete_sequence=[AZUL])
-            st.plotly_chart(estilo_grafico(fig_vio, PLANTILLA, 320), use_container_width=True)
+    # --- Gráfica A: Comportamiento completo (mín, máx y cuartiles reales) ---
+    st.markdown("**Rango completo: mínimo, máximo y cuartiles por hora**")
+    st.caption(
+        "Los bigotes muestran el valor **mínimo y máximo histórico real** (no recortados al 1.5×IQR). "
+        "La caja abarca el 50 % central (Q1-Q3) y la línea interior es la mediana."
+    )
+    _azul_r = int(AZUL[1:3], 16)
+    _azul_g = int(AZUL[3:5], 16)
+    _azul_b = int(AZUL[5:7], 16)
+    fig_completo = go.Figure()
+    for _, _row in _stats.iterrows():
+        fig_completo.add_trace(go.Box(
+            x=[int(_row["hora"])],
+            q1=[_row["q1"]],
+            median=[_row["mediana"]],
+            q3=[_row["q3"]],
+            lowerfence=[_row["minimo"]],
+            upperfence=[_row["maximo"]],
+            name="",
+            showlegend=False,
+            marker_color=AZUL,
+            line_color=AZUL,
+            fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.25)",
+            whiskerwidth=0.6,
+        ))
+    fig_completo.update_layout(
+        xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+        yaxis_title="Precio de bolsa ($/kWh)",
+    )
+    st.plotly_chart(estilo_grafico(fig_completo, PLANTILLA, 420), use_container_width=True)
 
-        alt3, alt4 = st.columns(2)
-        with alt3:
-            st.markdown("**Distribución acumulada (ECDF) por franja horaria**")
-            _franja_map = {
-                **{h: "Madrugada (0-5 h)" for h in range(6)},
-                **{h: "Mañana (6-11 h)" for h in range(6, 12)},
-                **{h: "Tarde (12-17 h)" for h in range(12, 18)},
-                **{h: "Pico (18-22 h)" for h in range(18, 23)},
-                23: "Noche (23 h)",
-            }
-            larga_ecdf = larga.copy()
-            larga_ecdf["Franja"] = larga_ecdf["hora"].map(_franja_map)
-            _orden_franja = ["Madrugada (0-5 h)", "Mañana (6-11 h)",
-                             "Tarde (12-17 h)", "Pico (18-22 h)", "Noche (23 h)"]
-            fig_ecdf = px.ecdf(
-                larga_ecdf, x="precio", color="Franja",
-                category_orders={"Franja": _orden_franja},
-                labels={"precio": "Precio de bolsa ($/kWh)"},
-                color_discrete_sequence=[AZUL, VERDE, NARANJA, "#a855f7", "#6b7280"])
-            st.plotly_chart(estilo_grafico(fig_ecdf, PLANTILLA, 320), use_container_width=True)
-        with alt4:
-            st.markdown("**Histograma con escala logarítmica (eje Y)**")
-            fig_hist_log = px.histogram(
-                larga, x="precio", nbins=80, log_y=True,
-                labels={"precio": "Precio de bolsa ($/kWh)"},
-                color_discrete_sequence=[AZUL])
-            st.plotly_chart(estilo_grafico(fig_hist_log, PLANTILLA, 320), use_container_width=True)
+    # --- Gráfica B: Solo cuartiles Q1-Q3 + mediana ---
+    st.markdown("**Rango intercuartílico por hora (Q1, mediana y Q3)**")
+    st.caption(
+        "Vista enfocada en el 50 % central de los precios. "
+        "La banda sombreada va de Q1 a Q3; los valores máximos y mínimos se anotan en la gráfica."
+    )
+    _q1 = _stats.set_index("hora").loc[_horas, "q1"].tolist()
+    _q3 = _stats.set_index("hora").loc[_horas, "q3"].tolist()
+    _med = _stats.set_index("hora").loc[_horas, "mediana"].tolist()
+    _maxs = _stats.set_index("hora").loc[_horas, "maximo"].tolist()
+    _mins = _stats.set_index("hora").loc[_horas, "minimo"].tolist()
 
+    fig_iqr = go.Figure()
+    # Banda Q1-Q3
+    fig_iqr.add_trace(go.Scatter(
+        x=_horas + _horas[::-1],
+        y=_q3 + _q1[::-1],
+        fill="toself",
+        fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.18)",
+        line=dict(width=0),
+        name="Banda Q1-Q3",
+        hoverinfo="skip",
+    ))
+    # Q3
+    fig_iqr.add_trace(go.Scatter(
+        x=_horas, y=_q3,
+        mode="lines", line=dict(color=AZUL, width=1.5, dash="dot"),
+        name="Q3 (p75)",
+        hovertemplate="Hora %{x}h — Q3: $%{y:.1f}<extra></extra>",
+    ))
+    # Mediana
+    fig_iqr.add_trace(go.Scatter(
+        x=_horas, y=_med,
+        mode="lines+markers", line=dict(color=AZUL, width=2.5),
+        marker=dict(size=5),
+        name="Mediana",
+        hovertemplate="Hora %{x}h — Mediana: $%{y:.1f}<extra></extra>",
+    ))
+    # Q1
+    fig_iqr.add_trace(go.Scatter(
+        x=_horas, y=_q1,
+        mode="lines", line=dict(color=AZUL, width=1.5, dash="dot"),
+        name="Q1 (p25)",
+        hovertemplate="Hora %{x}h — Q1: $%{y:.1f}<extra></extra>",
+    ))
+    # Anotaciones de máx y mín absolutos
+    _idx_max = int(_stats["maximo"].idxmax())
+    _idx_min = int(_stats["minimo"].idxmin())
+    _h_max = int(_stats.loc[_idx_max, "hora"])
+    _h_min = int(_stats.loc[_idx_min, "hora"])
+    fig_iqr.add_annotation(
+        x=_h_max, y=_stats.loc[_idx_max, "q3"],
+        text=f"Máx: ${_stats.loc[_idx_max, 'maximo']:.0f}",
+        showarrow=True, arrowhead=2, yanchor="bottom",
+        font=dict(size=11), ay=-30,
+    )
+    fig_iqr.add_annotation(
+        x=_h_min, y=_stats.loc[_idx_min, "q1"],
+        text=f"Mín: ${_stats.loc[_idx_min, 'minimo']:.0f}",
+        showarrow=True, arrowhead=2, yanchor="top",
+        font=dict(size=11), ay=30,
+    )
+    fig_iqr.update_layout(
+        xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+        yaxis_title="Precio de bolsa ($/kWh)",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        hovermode="x unified",
+    )
+    st.plotly_chart(estilo_grafico(fig_iqr, PLANTILLA, 420), use_container_width=True)
+
+    # --- Distribución por tipo de día ---
     if "base_tipo_dia" in larga.columns:
-        st.markdown("**Distribución del precio por tipo de día**")
+        st.markdown("**Rango completo por tipo de día**")
         larga["Tipo de día"] = larga["base_tipo_dia"].map(TIPO_DIA_ES).fillna(larga["base_tipo_dia"])
         orden = ["Hábil", "Sábado", "Domingo", "Festivo"]
-        fig_tipo = px.box(larga, x="Tipo de día", y="precio", points=False,
-                          category_orders={"Tipo de día": orden},
-                          labels={"precio": "Precio de bolsa ($/kWh)"},
-                          color_discrete_sequence=[VERDE])
-        fig_tipo.update_traces(whiskerwidth=0.5)
+        _stats_tipo = (
+            larga.groupby("Tipo de día")["precio"]
+            .agg(
+                q1=lambda x: float(x.quantile(0.25)),
+                mediana="median",
+                q3=lambda x: float(x.quantile(0.75)),
+                minimo="min",
+                maximo="max",
+            )
+            .reindex([t for t in orden if t in larga["Tipo de día"].unique()])
+            .reset_index()
+        )
+        fig_tipo = go.Figure()
+        _verd_r = int(VERDE[1:3], 16)
+        _verd_g = int(VERDE[3:5], 16)
+        _verd_b = int(VERDE[5:7], 16)
+        for _, _row in _stats_tipo.iterrows():
+            fig_tipo.add_trace(go.Box(
+                x=[_row["Tipo de día"]],
+                q1=[_row["q1"]],
+                median=[_row["mediana"]],
+                q3=[_row["q3"]],
+                lowerfence=[_row["minimo"]],
+                upperfence=[_row["maximo"]],
+                name="",
+                showlegend=False,
+                marker_color=VERDE,
+                line_color=VERDE,
+                fillcolor=f"rgba({_verd_r},{_verd_g},{_verd_b},0.25)",
+                whiskerwidth=0.6,
+            ))
+        fig_tipo.update_layout(
+            xaxis_title="Tipo de día",
+            yaxis_title="Precio de bolsa ($/kWh)",
+        )
         st.plotly_chart(estilo_grafico(fig_tipo, PLANTILLA, 400), use_container_width=True)
 
 
