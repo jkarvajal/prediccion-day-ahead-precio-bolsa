@@ -716,7 +716,7 @@ with tab_pred:
         csv = tabla.to_csv(index=False).encode("utf-8-sig")
         st.download_button("Descargar pronóstico (CSV)", data=csv,
                            file_name=f"pronostico_{fecha_objetivo.strftime('%Y%m%d')}.csv",
-                           mime="text/csv")
+                           mime="text/csv", key="dl_pronostico_pred")
 
 
 # ======================================================================== #
@@ -1873,9 +1873,10 @@ with tab_carga:
         "Descargar plantilla de ejemplo (CSV)",
         data=plantilla.to_csv(index=False).encode("utf-8-sig"),
         file_name="plantilla_dia_base.csv", mime="text/csv",
-        help="Tres días base de ejemplo con todas las columnas que el modelo necesita.")
+        help="Tres días base de ejemplo con todas las columnas que el modelo necesita.",
+        key="dl_plantilla_carga")
 
-    archivo = st.file_uploader("Archivo CSV con días base", type=["csv"])
+    archivo = st.file_uploader("Archivo CSV con días base", type=["csv"], key="fu_datos_nuevos")
     if archivo is None:
         st.info("Sube un CSV para generar el pronóstico. Puedes usar la plantilla de "
                 "ejemplo como referencia del formato.")
@@ -1903,7 +1904,8 @@ with tab_carga:
                 etiquetas = ([str(v) for v in nuevo["FECHA"]] if "FECHA" in nuevo.columns
                              else [f"Fila {i + 1}" for i in range(len(nuevo))])
                 pos = st.selectbox("Día base a pronosticar", range(len(nuevo)),
-                                   format_func=lambda i: etiquetas[i])
+                                   format_func=lambda i: etiquetas[i],
+                                   key="sel_dia_base")
                 row = nuevo.iloc[pos]
 
                 pred_persist_c = [float(row[f"h{h:02d}"]) for h in range(24)]
@@ -1953,7 +1955,8 @@ with tab_carga:
                 st.download_button(
                     "Descargar pronóstico (CSV)",
                     data=salida.to_csv(index=False).encode("utf-8-sig"),
-                    file_name="pronostico_datos_cargados.csv", mime="text/csv")
+                    file_name="pronostico_datos_cargados.csv", mime="text/csv",
+                    key="dl_pronostico_carga")
                 st.caption("El pronóstico usa los mismos modelos del proyecto. La calidad "
                            "depende de que las variables del día base estén bien calculadas, "
                            "como en la plantilla.")
