@@ -20,6 +20,8 @@ Cada sesion trabaja sobre archivos especificos. No mezclar.
 | **Paper** | `reports/paper/paper.tex` | No toca el borrador |
 | **Despliegue** | `app/app.py` | No toca documentos |
 | **Fase 3 - Entrega** | `reports/entregables_fase3/` | Solo valida e integra |
+| **Fase 4 - Entrega** | `reports/entregables_fase4/` | Solo valida e integra |
+| **Presentacion** | `reports/presentacion/` | Lee tesis, paper y despliegue; no los edita |
 | **Desarrollo inicial** | Solo consulta, no edita | Todo |
 
 ---
@@ -85,7 +87,7 @@ D:\Claude\Paper Latex\workspace\         <- directorio EXTERNO (editor LaTeX loc
 | 2 | Diseno y Construccion de Resultados | 1 oct 2026 | Completa |
 | 3 | Discusion de Resultados y Aportes | 29 oct 2026 | **En curso** -- Cap. 5 escrito, pendiente entregable PDF |
 | 4 | Entrega Documento del Proyecto | 22 nov 2026 | Pendiente |
-| 5 | Sustentacion y Divulgacion | 6 dic 2026 | Pendiente |
+| 5 | Sustentacion y Divulgacion | 6 dic 2026 | **En curso** -- presentacion PowerPoint (10-15 diapositivas) |
 
 **Entregable Fase 3:** capitulo de discusion (Cap. 5) + documento consolidado en PDF segun normas UNAD. Guardar en `reports/entregables_fase3/`.
 
