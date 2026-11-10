@@ -43,6 +43,8 @@ BASELINE_RESULTS_PATH = OUTPUTS_DIR / "baseline_global_results.csv"
 BASELINE_HOURLY_PATH = OUTPUTS_DIR / "baseline_hourly_results.csv"
 REGIMEN_PATH = OUTPUTS_DIR / "consolidado_por_regimen.csv"
 INTERVALOS_PATH = OUTPUTS_DIR / "intervalos_conformales.csv"
+CONSOLIDADO_PATH = OUTPUTS_DIR / "consolidado_estrategias.csv"
+DIEBOLD_MARIANO_PATH = OUTPUTS_DIR / "consolidado_diebold_mariano.csv"
 PREDICCION_AUTO_PATH = OUTPUTS_DIR / "prediccion_automatica.csv"
 PREDICCION_VERIF_PATH = OUTPUTS_DIR / "prediccion_verificacion.csv"
 
@@ -196,6 +198,20 @@ def load_intervalos():
     if not INTERVALOS_PATH.exists():
         return pd.DataFrame()
     return pd.read_csv(INTERVALOS_PATH)
+
+
+@st.cache_data
+def load_consolidado():
+    if not CONSOLIDADO_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_csv(CONSOLIDADO_PATH)
+
+
+@st.cache_data
+def load_diebold_mariano():
+    if not DIEBOLD_MARIANO_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_csv(DIEBOLD_MARIANO_PATH)
 
 
 @st.cache_data(ttl=3600)
@@ -1408,10 +1424,10 @@ with tab_desemp:
         if _bl_path.exists():
             _bl_hr = pd.read_csv(_bl_path)
             _bl_hr = _bl_hr[_bl_hr["modelo"] == "Baseline_hoy"][
-                ["hora", "MAE", "RMSE", "R2"]].copy()
-            _bl_hr.columns = ["hora", "MAE_p", "RMSE_p", "R2_p"]
-            _lasso_hr = _mh[["hora", "MAE", "RMSE", "R2"]].copy()
-            _lasso_hr.columns = ["hora", "MAE_l", "RMSE_l", "R2_l"]
+                ["hora", "MAE", "RMSE", "R2", "sMAPE"]].copy()
+            _bl_hr.columns = ["hora", "MAE_p", "RMSE_p", "R2_p", "sMAPE_p"]
+            _lasso_hr = _mh[["hora", "MAE", "RMSE", "R2", "sMAPE"]].copy()
+            _lasso_hr.columns = ["hora", "MAE_l", "RMSE_l", "R2_l", "sMAPE_l"]
             _comb = pd.merge(_lasso_hr, _bl_hr, on="hora").sort_values("hora")
             _comb["mejora_pct"] = (_comb["MAE_p"] - _comb["MAE_l"]) / _comb["MAE_p"] * 100
         else:
@@ -1632,6 +1648,147 @@ with tab_desemp:
                                PLANTILLA, 420),
                 use_container_width=True,
             )
+
+    # ------------------------------------------------------------------ #
+    # 6. sMAPE por hora
+    # ------------------------------------------------------------------ #
+    st.markdown("**6. Error porcentual simétrico (sMAPE) por hora del día**")
+    st.caption(
+        "El sMAPE es independiente de la escala del precio: valores cercanos a 0 % "
+        "indican predicciones más precisas en términos relativos. "
+        "Permite comparar horas con niveles de precio muy distintos."
+    )
+    if _comb.empty or "sMAPE_l" not in _comb.columns:
+        st.info("No hay datos de sMAPE disponibles.")
+    else:
+        fig_smape = go.Figure()
+        fig_smape.add_trace(go.Scatter(
+            x=_horas_d, y=_comb["sMAPE_p"].tolist(), mode="lines+markers",
+            name="Persistencia", line=dict(color=_col_pers, width=2), marker=dict(size=5),
+            hovertemplate="Persistencia — Hora %{x}h: %{y:.1f}%<extra></extra>",
+        ))
+        fig_smape.add_trace(go.Scatter(
+            x=_horas_d, y=_comb["sMAPE_l"].tolist(), mode="lines+markers",
+            name="Lasso", line=dict(color=_col_lasso, width=2.5), marker=dict(size=5),
+            hovertemplate="Lasso — Hora %{x}h: %{y:.1f}%<extra></extra>",
+        ))
+        fig_smape.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+                            line_width=0, annotation_text="Franja pico",
+                            annotation_position="top left")
+        fig_smape.update_layout(
+            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+            yaxis_title="sMAPE (%)",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
+        )
+        st.plotly_chart(estilo_grafico(fig_smape, PLANTILLA, 400), use_container_width=True)
+
+    # ------------------------------------------------------------------ #
+    # 7. Comparativa global de las 8 estrategias (4 métricas)
+    # ------------------------------------------------------------------ #
+    st.markdown("**7. Comparativa global de estrategias (conjunto de prueba)**")
+    st.caption(
+        "Las 8 estrategias evaluadas ordenadas por MAE. "
+        "Las barras muestran el valor de cada métrica; "
+        "menor es mejor para MAE, RMSE y sMAPE; mayor es mejor para R²."
+    )
+    _cons = load_consolidado()
+    if _cons.empty:
+        st.info("No hay datos de consolidado disponibles.")
+    else:
+        _cons_s = _cons.sort_values("MAE").reset_index(drop=True)
+        _estrategias = _cons_s["estrategia"].tolist()
+        _pal_cons = [VERDE if e == "Lasso horario" else
+                     (AZUL if e == "Persistencia diaria" else
+                      (NARANJA if e == "Aprendizaje residual" else "#6b7280"))
+                     for e in _estrategias]
+
+        def _mini_bar(col, titulo, unidad, mayor_es_mejor=False):
+            vals = _cons_s[col].tolist()
+            _ref = _cons_s[_cons_s["estrategia"] == "Persistencia diaria"][col].values
+            _ref_v = float(_ref[0]) if len(_ref) else None
+            _colors_mb = []
+            for _e, _v in zip(_estrategias, vals):
+                if _e == "Persistencia diaria":
+                    _colors_mb.append(AZUL)
+                elif (mayor_es_mejor and _ref_v is not None and _v > _ref_v) or \
+                     (not mayor_es_mejor and _ref_v is not None and _v < _ref_v):
+                    _colors_mb.append(VERDE)
+                else:
+                    _colors_mb.append(NARANJA)
+            fig_mb = go.Figure(go.Bar(
+                x=vals, y=_estrategias, orientation="h",
+                marker_color=_colors_mb, opacity=0.85,
+                text=[f"{v:.1f}{unidad}" for v in vals],
+                textposition="outside",
+                hovertemplate="%{y}: %{x:.2f}" + unidad + "<extra></extra>",
+            ))
+            if _ref_v is not None:
+                fig_mb.add_vline(x=_ref_v, line_dash="dash", line_color=AZUL,
+                                 line_width=1.5, opacity=0.5)
+            fig_mb.update_layout(
+                title=dict(text=titulo, font=dict(size=12), x=0),
+                yaxis=dict(autorange="reversed"),
+                xaxis_title=unidad,
+                margin=dict(l=5, r=55, t=36, b=20),
+                showlegend=False,
+            )
+            return fig_mb
+
+        _gc1, _gc2 = st.columns(2)
+        with _gc1:
+            st.plotly_chart(estilo_grafico(_mini_bar("MAE", "MAE ($/kWh)", ""), PLANTILLA, 380),
+                            use_container_width=True)
+            st.plotly_chart(estilo_grafico(_mini_bar("sMAPE", "sMAPE (%)", "%"), PLANTILLA, 380),
+                            use_container_width=True)
+        with _gc2:
+            st.plotly_chart(estilo_grafico(_mini_bar("RMSE", "RMSE ($/kWh)", ""), PLANTILLA, 380),
+                            use_container_width=True)
+            st.plotly_chart(estilo_grafico(_mini_bar("R2", "R² (coef. determinación)", "",
+                                                     mayor_es_mejor=True), PLANTILLA, 380),
+                            use_container_width=True)
+
+    # ------------------------------------------------------------------ #
+    # 8. Test de Diebold-Mariano
+    # ------------------------------------------------------------------ #
+    st.markdown("**8. Significancia estadística: test de Diebold-Mariano**")
+    st.caption(
+        "El test DM evalúa si la diferencia de error entre dos estrategias es "
+        "estadísticamente significativa (p < 0.05). "
+        "Un estadístico positivo favorable a 'estrategia' indica que esa estrategia "
+        "supera a la persistencia en ese criterio."
+    )
+    _dm = load_diebold_mariano()
+    if _dm.empty:
+        st.info("No hay datos del test Diebold-Mariano disponibles.")
+    else:
+        _dm_disp = _dm.copy()
+        _dm_disp.columns = ["Estrategia", "Criterio", "DM stat", "p-valor",
+                             "Significativo (5%)", "Favorece"]
+        _dm_disp["Significativo (5%)"] = _dm_disp["Significativo (5%)"].map(
+            {True: "Si", False: "No"})
+        _dm_disp["p-valor"] = _dm_disp["p-valor"].apply(
+            lambda v: f"< 0.001" if v < 0.001 else f"{v:.3f}")
+        _dm_disp["DM stat"] = _dm_disp["DM stat"].apply(lambda v: f"{v:.3f}")
+        st.dataframe(
+            _dm_disp,
+            use_container_width=True,
+            hide_index=True,
+            height=min(50 + 35 * len(_dm_disp), 560),
+            column_config={
+                "Estrategia": st.column_config.TextColumn(width="medium"),
+                "Criterio": st.column_config.TextColumn(width="small"),
+                "DM stat": st.column_config.TextColumn(width="small"),
+                "p-valor": st.column_config.TextColumn(width="small"),
+                "Significativo (5%)": st.column_config.TextColumn(width="small"),
+                "Favorece": st.column_config.TextColumn(width="medium"),
+            },
+        )
+        st.caption(
+            "Lasso / Ap. residual vs. persistencia diaria (referencia). "
+            "Criterio MAE: DM positivo favorece a persistencia. "
+            "Criterio RMSE: DM negativo favorece a la estrategia comparada."
+        )
 
 
 # ======================================================================== #
