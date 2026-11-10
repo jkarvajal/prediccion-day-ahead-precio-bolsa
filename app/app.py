@@ -1395,54 +1395,242 @@ with tab_expl:
 with tab_desemp:
     st.subheader("¿Qué tan bien predice el modelo, y cuándo?")
     st.caption("Evaluación sobre el conjunto de prueba (diciembre de 2022 a marzo de "
-               "2026), desde dos ángulos: el error a lo largo del día y según el régimen "
-               "del precio. Es el resultado central del proyecto.")
+               "2026). Se analizan el error horario, la mejora frente a la persistencia, "
+               "el coeficiente de determinación, los intervalos de incertidumbre y el "
+               "desempeño según el régimen del precio.")
 
-    st.markdown("**Error medio por hora del día (MAE)**")
-    eph = load_error_por_hora()
-    if eph.empty:
+    # -- datos horarios combinados (Lasso + Persistencia) --
+    _eph = load_error_por_hora()
+    _mh  = load_metrics_by_hour()   # Lasso, incluye RMSE, R2, sMAPE, es_pico
+    if not _eph.empty and not _mh.empty:
+        _bl_path = BASELINE_HOURLY_PATH
+        if _bl_path.exists():
+            _bl_hr = pd.read_csv(_bl_path)
+            _bl_hr = _bl_hr[_bl_hr["modelo"] == "Baseline_hoy"][
+                ["hora", "MAE", "RMSE", "R2"]].copy()
+            _bl_hr.columns = ["hora", "MAE_p", "RMSE_p", "R2_p"]
+            _lasso_hr = _mh[["hora", "MAE", "RMSE", "R2"]].copy()
+            _lasso_hr.columns = ["hora", "MAE_l", "RMSE_l", "R2_l"]
+            _comb = pd.merge(_lasso_hr, _bl_hr, on="hora").sort_values("hora")
+            _comb["mejora_pct"] = (_comb["MAE_p"] - _comb["MAE_l"]) / _comb["MAE_p"] * 100
+        else:
+            _comb = pd.DataFrame()
+    else:
+        _comb = pd.DataFrame()
+    _horas_d = _comb["hora"].tolist() if not _comb.empty else []
+
+    # -- colores --
+    _col_lasso = VERDE
+    _col_pers  = AZUL
+    _col_mejorado = "#16a34a"
+    _col_peor     = "#dc2626"
+    _lasso_r, _lasso_g, _lasso_b = int(VERDE[1:3],16), int(VERDE[3:5],16), int(VERDE[5:7],16)
+
+    # ------------------------------------------------------------------ #
+    # 1. MAE por hora
+    # ------------------------------------------------------------------ #
+    st.markdown("**1. Error absoluto medio (MAE) por hora del día**")
+    if _eph.empty:
         st.info("No hay datos de error por hora disponibles.")
     else:
-        fig_eph = px.line(
-            eph, x="hora", y="MAE", color="Modelo", markers=True,
-            labels={"hora": "Hora del día", "MAE": "MAE ($/kWh)"},
-            color_discrete_map={"Lasso": VERDE, "Persistencia": AZUL})
-        fig_eph.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08, line_width=0,
-                          annotation_text="Franja pico", annotation_position="top left")
-        fig_eph.update_xaxes(tickmode="linear", dtick=2)
-        fig_eph.update_layout(hovermode="x unified",
-                              legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                                          xanchor="right", x=1))
-        st.plotly_chart(estilo_grafico(fig_eph, PLANTILLA, 400), use_container_width=True)
-        st.caption("Entre más bajo el MAE, mejor. El error de ambos modelos crece en las "
-                   "horas de la tarde y la noche, que son las de mayor precio y "
-                   "volatilidad; es ahí donde el pronóstico es más difícil.")
+        fig_eph = go.Figure()
+        for _mod, _col in [("Persistencia", _col_pers), ("Lasso", _col_lasso)]:
+            _sub = _eph[_eph["Modelo"] == _mod]
+            fig_eph.add_trace(go.Scatter(
+                x=_sub["hora"], y=_sub["MAE"], mode="lines+markers",
+                name=_mod, line=dict(color=_col, width=2.5), marker=dict(size=5),
+                hovertemplate=f"{_mod} — Hora %{{x}}h: $%{{y:.1f}}<extra></extra>",
+            ))
+        fig_eph.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+                          line_width=0, annotation_text="Franja pico",
+                          annotation_position="top left")
+        fig_eph.update_layout(
+            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+            yaxis_title="MAE ($/kWh)",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
+        )
+        st.plotly_chart(estilo_grafico(fig_eph, PLANTILLA, 420), use_container_width=True)
+        st.caption("El error crece en las horas de tarde y noche (mayor precio y volatilidad). "
+                   "La franja rosada marca las horas de mayor demanda (18-22 h).")
 
-    st.markdown("**Desempeño según el régimen del precio**")
+    # ------------------------------------------------------------------ #
+    # 2. Reducción de error relativa frente a persistencia
+    # ------------------------------------------------------------------ #
+    st.markdown("**2. Reducción de error respecto a persistencia (% MAE)**")
+    st.caption("Positivo = el Lasso supera a la persistencia en esa hora; negativo = la persistencia gana.")
+    if _comb.empty:
+        st.info("Datos insuficientes para calcular la mejora relativa.")
+    else:
+        _mejora = _comb["mejora_pct"].tolist()
+        _colores_barra = [_col_mejorado if v >= 0 else _col_peor for v in _mejora]
+        fig_mej = go.Figure()
+        fig_mej.add_trace(go.Bar(
+            x=_horas_d, y=_mejora,
+            marker_color=_colores_barra, opacity=0.85,
+            hovertemplate="Hora %{x}h — mejora: %{y:.1f}%<extra></extra>",
+            showlegend=False,
+        ))
+        fig_mej.add_hline(y=0, line_dash="dot", line_color="gray", line_width=1)
+        fig_mej.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+                          line_width=0, annotation_text="Franja pico",
+                          annotation_position="top left")
+        fig_mej.update_layout(
+            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+            yaxis_title="Reducción de MAE (%)",
+        )
+        st.plotly_chart(estilo_grafico(fig_mej, PLANTILLA, 380), use_container_width=True)
+
+    # ------------------------------------------------------------------ #
+    # 3. R² por hora
+    # ------------------------------------------------------------------ #
+    st.markdown("**3. Coeficiente de determinación (R²) por hora**")
+    st.caption("R² = 1 indica predicción perfecta; R² = 0 equivale a usar solo la media histórica. "
+               "Cuanto más alto y más estable, mejor.")
+    if _comb.empty:
+        st.info("Datos insuficientes.")
+    else:
+        fig_r2 = go.Figure()
+        fig_r2.add_trace(go.Scatter(
+            x=_horas_d, y=_comb["R2_p"].tolist(), mode="lines+markers",
+            name="Persistencia", line=dict(color=_col_pers, width=2), marker=dict(size=5),
+            hovertemplate="Persistencia — Hora %{x}h: R²=%{y:.3f}<extra></extra>",
+        ))
+        fig_r2.add_trace(go.Scatter(
+            x=_horas_d, y=_comb["R2_l"].tolist(), mode="lines+markers",
+            name="Lasso", line=dict(color=_col_lasso, width=2.5), marker=dict(size=5),
+            hovertemplate="Lasso — Hora %{x}h: R²=%{y:.3f}<extra></extra>",
+        ))
+        fig_r2.add_hline(y=0, line_dash="dot", line_color="gray", line_width=1,
+                         annotation_text="R²=0", annotation_position="right")
+        fig_r2.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+                         line_width=0, annotation_text="Franja pico",
+                         annotation_position="top left")
+        fig_r2.update_layout(
+            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+            yaxis_title="R²",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
+        )
+        st.plotly_chart(estilo_grafico(fig_r2, PLANTILLA, 400), use_container_width=True)
+
+    # ------------------------------------------------------------------ #
+    # 4. Intervalos conformales
+    # ------------------------------------------------------------------ #
+    st.markdown("**4. Intervalos de incertidumbre por hora (intervalos conformales al 90 %)**")
+    st.caption("El intervalo muestra el rango esperado del error: q_low es el límite inferior "
+               "y q_high el superior. Un intervalo más estrecho indica mayor confianza en la predicción.")
+    _intv = load_intervalos()
+    if _intv.empty:
+        st.info("No hay datos de intervalos disponibles.")
+    else:
+        _intv_l = _intv[_intv["modelo"] == "Lasso"].sort_values("hora")
+        _ih = _intv_l["hora"].tolist()
+        _iq_low  = _intv_l["q_low"].tolist()
+        _iq_high = _intv_l["q_high"].tolist()
+        _iancho  = [h - l for h, l in zip(_iq_high, _iq_low)]
+        fig_intv = go.Figure()
+        fig_intv.add_trace(go.Scatter(
+            x=_ih + _ih[::-1],
+            y=_iq_high + _iq_low[::-1],
+            fill="toself",
+            fillcolor=f"rgba({_lasso_r},{_lasso_g},{_lasso_b},0.15)",
+            line=dict(width=0), name="Banda 90%", hoverinfo="skip",
+        ))
+        fig_intv.add_trace(go.Scatter(
+            x=_ih, y=_iq_high, mode="lines",
+            line=dict(color=_col_lasso, width=1.5, dash="dot"), name="q_high (límite superior)",
+            hovertemplate="Hora %{x}h — q_high: $%{y:.1f}<extra></extra>",
+        ))
+        fig_intv.add_trace(go.Scatter(
+            x=_ih, y=[0]*len(_ih), mode="lines",
+            line=dict(color="gray", width=1, dash="dot"), name="Error = 0", hoverinfo="skip",
+        ))
+        fig_intv.add_trace(go.Scatter(
+            x=_ih, y=_iq_low, mode="lines",
+            line=dict(color=NARANJA, width=1.5, dash="dot"), name="q_low (límite inferior)",
+            hovertemplate="Hora %{x}h — q_low: $%{y:.1f}<extra></extra>",
+        ))
+        fig_intv.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+                           line_width=0, annotation_text="Franja pico",
+                           annotation_position="top left")
+        fig_intv.update_layout(
+            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+            yaxis_title="Error de predicción ($/kWh)",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
+        )
+        st.plotly_chart(estilo_grafico(fig_intv, PLANTILLA, 420), use_container_width=True)
+
+    # ------------------------------------------------------------------ #
+    # 5. Ranking de todos los modelos por régimen
+    # ------------------------------------------------------------------ #
+    st.markdown("**5. Comparativa de estrategias por régimen del precio**")
     reg = load_regimen()
     if reg.empty:
         st.info("No hay datos de régimen disponibles.")
     else:
-        destacadas = ["Persistencia diaria", "Lasso horario", "Aprendizaje residual"]
-        reg_f = reg[reg["estrategia"].isin(destacadas)].copy()
-        orden_reg = ["Precio calmo<br>(< 300 $/kWh)", "Precio volátil<br>(≥ 300 $/kWh)"]
-        orden_mod = ["Persistencia (referencia)", "Lasso", "Aprendizaje residual"]
-        fig_reg = px.bar(
-            reg_f, x="Régimen", y="MAE", color="Modelo", barmode="group",
-            text_auto=".0f",
-            category_orders={"Régimen": orden_reg, "Modelo": orden_mod},
-            labels={"MAE": "Error medio MAE ($/kWh)", "Régimen": ""},
-            color_discrete_map={"Persistencia (referencia)": AZUL, "Lasso": VERDE,
-                                "Aprendizaje residual": NARANJA})
-        fig_reg.update_traces(textfont_size=13, textposition="outside", cliponaxis=False)
-        fig_reg.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                                          xanchor="center", x=0.5, title_text=""))
-        st.plotly_chart(estilo_grafico(fig_reg, PLANTILLA, 440), use_container_width=True)
-        st.caption("El precio se separa en régimen calmo (menor a 300 $/kWh) y volátil "
-                   "(300 o más). En el régimen calmo la persistencia es imbatible, pero en "
-                   "el régimen volátil el Lasso y el aprendizaje residual la superan: ahí "
-                   "es donde el modelo aporta, y es justamente donde un error cuesta más "
-                   "caro. Este matiz es el hallazgo principal del trabajo.")
+        st.caption("Cada estrategia ordenada de menor a mayor error (MAE). "
+                   "El precio se separa en régimen calmo (< 300 $/kWh) y volátil (≥ 300 $/kWh); "
+                   "el modelo aporta principalmente en el régimen volátil.")
+        _reg_calmo   = (reg[reg["regimen"] == "calmo (<300)"]
+                        .sort_values("MAE").reset_index(drop=True))
+        _reg_volatil = (reg[reg["regimen"] == "volatil (>=300)"]
+                        .sort_values("MAE").reset_index(drop=True))
+
+        def _lollipop_regimen(df_r, titulo, col_ref):
+            _modelos = df_r["estrategia"].tolist()
+            _maes    = df_r["MAE"].tolist()
+            _mae_ref = df_r[df_r["estrategia"] == "Persistencia diaria"]["MAE"].values
+            _mae_ref = float(_mae_ref[0]) if len(_mae_ref) else None
+            _colors  = []
+            for _e, _m in zip(_modelos, _maes):
+                if _e == "Persistencia diaria":
+                    _colors.append(AZUL)
+                elif _e in ("Lasso horario", "Aprendizaje residual"):
+                    _colors.append(VERDE if (_mae_ref is None or _m < _mae_ref) else NARANJA)
+                else:
+                    _colors.append(NARANJA if (_mae_ref is None or _m < _mae_ref) else "#9ca3af")
+            fig_ll = go.Figure()
+            # líneas de lollipop
+            for _i, (_mod, _mae, _c) in enumerate(zip(_modelos, _maes, _colors)):
+                fig_ll.add_trace(go.Scatter(
+                    x=[0, _mae], y=[_mod, _mod], mode="lines",
+                    line=dict(color=_c, width=2), showlegend=False, hoverinfo="skip",
+                ))
+            # puntos
+            fig_ll.add_trace(go.Scatter(
+                x=_maes, y=_modelos, mode="markers+text",
+                marker=dict(color=_colors, size=12, line=dict(color="white", width=1.5)),
+                text=[f"${v:.0f}" for v in _maes],
+                textposition="middle right", textfont=dict(size=11),
+                showlegend=False,
+                hovertemplate="%{y}: $%{x:.1f}<extra></extra>",
+            ))
+            if _mae_ref:
+                fig_ll.add_vline(x=_mae_ref, line_dash="dash", line_color=AZUL,
+                                 line_width=1.5, opacity=0.6)
+            fig_ll.update_layout(
+                title=dict(text=titulo, font=dict(size=13), x=0),
+                xaxis_title="MAE ($/kWh)",
+                yaxis=dict(autorange="reversed"),
+                margin=dict(l=10, r=60),
+            )
+            return fig_ll
+
+        _c1, _c2 = st.columns(2)
+        with _c1:
+            st.plotly_chart(
+                estilo_grafico(_lollipop_regimen(_reg_calmo, "Régimen calmo (< 300 $/kWh)", AZUL),
+                               PLANTILLA, 420),
+                use_container_width=True,
+            )
+        with _c2:
+            st.plotly_chart(
+                estilo_grafico(_lollipop_regimen(_reg_volatil, "Régimen volátil (≥ 300 $/kWh)", NARANJA),
+                               PLANTILLA, 420),
+                use_container_width=True,
+            )
 
 
 # ======================================================================== #
