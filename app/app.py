@@ -564,24 +564,25 @@ with tab_pred:
 
     st.markdown("**Mostrar en la gráfica:**")
     m1, m2, m3, m4 = st.columns(4)
-    ver_real = m1.checkbox("Precio real observado", value=True)
-    ver_lasso = m2.checkbox("Modelo Lasso", value=True)
+    ver_real = m1.checkbox("Precio real observado", value=True, key="chk_ver_real")
+    ver_lasso = m2.checkbox("Modelo Lasso", value=True, key="chk_ver_lasso")
     ver_residual = m3.checkbox("Aprendizaje residual", value=models_res is not None,
-                               disabled=models_res is None)
-    ver_persist = m4.checkbox("Persistencia diaria", value=True)
+                               disabled=models_res is None, key="chk_ver_residual")
+    ver_persist = m4.checkbox("Persistencia diaria", value=True, key="chk_ver_persist")
 
     intervalos = load_intervalos()
     b1, b2 = st.columns([1.1, 1])
-    ver_banda = b1.checkbox("Mostrar intervalo de incertidumbre (90 %)", value=False,
+    ver_banda = b1.checkbox("Mostrar intervalo de incertidumbre (90 %)", value=not intervalos.empty,
                             disabled=intervalos.empty,
                             help="Banda conformal: el rango donde se espera que caiga el "
-                                 "precio real con un 90 % de probabilidad.")
+                                 "precio real con un 90 % de probabilidad.",
+                            key="chk_ver_banda")
     opciones_banda = ["Lasso", "Persistencia"]
     if models_res is not None:
         opciones_banda.insert(1, "Aprendizaje residual")
     modelo_banda = b2.selectbox("Intervalo del modelo", opciones_banda,
                                 disabled=(intervalos.empty or not ver_banda),
-                                label_visibility="collapsed")
+                                label_visibility="collapsed", key="sel_modelo_banda")
 
     fila_match = df[df["FECHA"].dt.date == fecha_sel]
     if fila_match.empty:
