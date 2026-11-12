@@ -1423,6 +1423,8 @@ with tab_desemp:
         _bl_path = BASELINE_HOURLY_PATH
         if _bl_path.exists():
             _bl_hr = pd.read_csv(_bl_path)
+            _bl_semana_hr = _bl_hr[_bl_hr["modelo"] == "Baseline_semana_pasada"][
+                ["hora", "MAE", "sMAPE"]].copy()
             _bl_hr = _bl_hr[_bl_hr["modelo"] == "Baseline_hoy"][
                 ["hora", "MAE", "RMSE", "R2", "sMAPE"]].copy()
             _bl_hr.columns = ["hora", "MAE_p", "RMSE_p", "R2_p", "sMAPE_p"]
@@ -1430,10 +1432,20 @@ with tab_desemp:
             _lasso_hr.columns = ["hora", "MAE_l", "RMSE_l", "R2_l", "sMAPE_l"]
             _comb = pd.merge(_lasso_hr, _bl_hr, on="hora").sort_values("hora")
             _comb["mejora_pct"] = (_comb["MAE_p"] - _comb["MAE_l"]) / _comb["MAE_p"] * 100
+            # datos semanal para gráfica del rezago
+            if not _bl_semana_hr.empty:
+                _bl_semana_hr.columns = ["hora", "MAE_s", "sMAPE_s"]
+                _comb_rezago = pd.merge(
+                    _comb[["hora", "MAE_p", "sMAPE_p"]], _bl_semana_hr, on="hora"
+                ).sort_values("hora")
+            else:
+                _comb_rezago = pd.DataFrame()
         else:
             _comb = pd.DataFrame()
+            _comb_rezago = pd.DataFrame()
     else:
         _comb = pd.DataFrame()
+        _comb_rezago = pd.DataFrame()
     _horas_d = _comb["hora"].tolist() if not _comb.empty else []
 
     # -- colores --
@@ -1790,6 +1802,55 @@ with tab_desemp:
             "Criterio RMSE: DM negativo favorece a la estrategia comparada."
         )
 
+    # ------------------------------------------------------------------ #
+    # 9. Costo del rezago de XM: D-1 vs D-7
+    # ------------------------------------------------------------------ #
+    st.markdown("**9. Rezago de publicación de XM: persistencia D-1 frente a D-7**")
+    st.caption(
+        "La persistencia diaria (D-1) utiliza el precio de ayer; la persistencia semanal "
+        "(D-7) usa el precio de hace siete días. Por el rezago de publicación de XM "
+        "(3-4 días), el dato de D-1 no está disponible cuando se opera para el día siguiente "
+        "real: **D-7 es la única línea base verdaderamente operable**. "
+        "Esta gráfica muestra el costo en precisión de esa restricción."
+    )
+    if _comb_rezago.empty:
+        st.info("No hay datos de persistencia semanal disponibles.")
+    else:
+        _hz_r = _comb_rezago["hora"].tolist()
+        _mae_d1_global = round(float(_comb_rezago["MAE_p"].mean()), 1)
+        _mae_d7_global = round(float(_comb_rezago["MAE_s"].mean()), 1)
+        _incr_pct = round((_mae_d7_global / _mae_d1_global - 1) * 100)
+        fig_rezago = go.Figure()
+        fig_rezago.add_trace(go.Scatter(
+            x=_hz_r, y=_comb_rezago["MAE_p"].tolist(), mode="lines+markers",
+            name="Persistencia D-1 (no operable en t. real)",
+            line=dict(color=AZUL, width=2.5, dash="dash"), marker=dict(size=5),
+            hovertemplate="D-1 — Hora %{x}h: $%{y:.1f}<extra></extra>",
+        ))
+        fig_rezago.add_trace(go.Scatter(
+            x=_hz_r, y=_comb_rezago["MAE_s"].tolist(), mode="lines+markers",
+            name="Persistencia D-7 (operable con rezago XM)",
+            line=dict(color=NARANJA, width=2.5), marker=dict(size=5),
+            hovertemplate="D-7 — Hora %{x}h: $%{y:.1f}<extra></extra>",
+        ))
+        fig_rezago.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+                             line_width=0, annotation_text="Franja pico",
+                             annotation_position="top left")
+        fig_rezago.update_layout(
+            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+            yaxis_title="MAE ($/kWh)",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
+        )
+        st.plotly_chart(estilo_grafico(fig_rezago, PLANTILLA, 420), use_container_width=True)
+        st.caption(
+            f"MAE global promedio — D-1: **${_mae_d1_global}/kWh** | "
+            f"D-7: **${_mae_d7_global}/kWh** (+{_incr_pct}% de error adicional). "
+            "La diferencia mide cuánto puede cambiar el precio en siete días. "
+            "D-1 sigue siendo la referencia de la evaluación retrospectiva; "
+            "D-7 representa el costo operativo real del rezago."
+        )
+
 
 # ======================================================================== #
 # Vista 5: clima y precio (ONI y embalses)
@@ -1961,6 +2022,14 @@ with tab_carga:
             fig_auto = estilo_grafico(fig_auto, PLANTILLA, 300)
             fig_auto.update_layout(margin=dict(t=30, b=40))
             st.plotly_chart(fig_auto, use_container_width=True)
+        st.info(
+            "**Nota sobre operabilidad:** La línea de Persistencia usa el precio del día "
+            "anterior (D-1). XM publica los datos con 3-4 días de rezago, por lo que D-1 "
+            "no siempre está disponible en tiempo real. La única línea base verdaderamente "
+            "operable es la **persistencia semanal (D-7)**, con un MAE histórico de ~163 $/kWh "
+            "(frente a ~69 $/kWh de D-1). Ver la gráfica 9 en la pestaña Desempeño del modelo.",
+            icon="ℹ️",
+        )
         st.divider()
 
     # --- Verificacion: pronostico frente al precio real observado ---
