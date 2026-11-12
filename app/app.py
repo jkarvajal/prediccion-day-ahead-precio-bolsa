@@ -486,6 +486,21 @@ tab_hist, tab_expl, tab_clima, tab_pred, tab_desemp, tab_carga = st.tabs(
     ["Histórico del precio", "Explorar patrones", "Clima y precio",
      "Predicción del día siguiente", "Desempeño del modelo", "Pronóstico con datos nuevos"])
 
+# Restaurar pestaña activa tras rerun (evita salto a pestaña 1 al interactuar con widgets)
+if st.session_state.get("_force_tab", -1) >= 0:
+    _ft = st.session_state.pop("_force_tab")
+    import streamlit.components.v1 as _cmp  # noqa: PLC0415
+    _cmp.html(f"""<script>
+    (function(){{
+        function _go(){{
+            var t=window.parent.document.querySelectorAll('[data-testid="stTab"]');
+            if(t.length>={_ft+1}){{t[{_ft}].click();return;}}
+            setTimeout(_go,60);
+        }}
+        setTimeout(_go,80);
+    }})();
+    </script>""", height=0)
+
 
 # ======================================================================== #
 # Vista 1: histórico del precio (rango y agregación)
@@ -2003,6 +2018,8 @@ with tab_carga:
             _d7_fecha = fecha_base_auto - _td(days=7)
             _tiene_d7 = "d7" in pred_auto.columns and pred_auto["d7"].notna().any()
             _d7_precios = pred_auto["d7"].tolist() if _tiene_d7 else []
+            def _d7_on_change():
+                st.session_state["_force_tab"] = 5
             ver_d7 = st.checkbox(
                 "Mostrar persistencia semanal D-7 (operable con rezago XM)",
                 value=False,
@@ -2014,6 +2031,7 @@ with tab_carga:
                     "MAE histórico: ~163 $/kWh (frente a ~69 $/kWh de D-1)."
                 ),
                 key="chk_d7_auto",
+                on_change=_d7_on_change,
             )
             fig_auto = go.Figure()
             fig_auto.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
@@ -2041,10 +2059,10 @@ with tab_carga:
                 ))
             fig_auto.update_layout(
                 xaxis_title="Hora del dia", yaxis_title="Precio ($/kWh)",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
             )
             fig_auto = estilo_grafico(fig_auto, PLANTILLA, 300)
-            fig_auto.update_layout(margin=dict(t=30, b=40))
+            fig_auto.update_layout(margin=dict(t=30, b=90))
             st.plotly_chart(fig_auto, use_container_width=True)
         st.info(
             "**Nota sobre operabilidad:** La línea de Persistencia usa el precio del día "
