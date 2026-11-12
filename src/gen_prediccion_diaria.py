@@ -123,8 +123,18 @@ def main():
                  precios_df["FECHA"].dt.date.tolist()[-5:])
         sys.exit(1)
 
-    # Persistencia: precios del dia base
+    # Persistencia D-1: precios del dia base
     pred_persist = [float(fila.get(f"h{h:02d}", float("nan"))) for h in range(24)]
+
+    # Persistencia D-7: precios de fecha_base - 7 (baseline operable con rezago XM)
+    fecha_d7 = fecha_base - timedelta(days=7)
+    _d7_row = precios_df[precios_df["FECHA"].dt.date == fecha_d7]
+    if not _d7_row.empty:
+        pred_d7 = [float(_d7_row.iloc[0].get(f"h{h:02d}", float("nan"))) for h in range(24)]
+        log.info("D-7 (%s): promedio %.1f $/kWh", fecha_d7, float(np.nanmean(pred_d7)))
+    else:
+        pred_d7 = [float("nan")] * 24
+        log.warning("No se encontro precio para D-7 (%s)", fecha_d7)
 
     # Lasso
     if MODEL_LASSO_PATH.exists():
@@ -155,6 +165,7 @@ def main():
         "persistencia": [round(p, 2) for p in pred_persist],
         "lasso": [round(p, 2) for p in pred_lasso],
         "residual": [round(p, 2) for p in pred_residual],
+        "d7": [round(p, 2) if not np.isnan(p) else float("nan") for p in pred_d7],
     })
     salida.to_csv(SALIDA, index=False, encoding="utf-8")
     log.info("Prediccion guardada: %s", SALIDA)

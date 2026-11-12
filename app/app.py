@@ -1988,7 +1988,7 @@ with tab_carga:
             prom_lasso = float(pred_auto["lasso"].mean())
             prom_res = float(pred_auto["residual"].mean())
             ca, cb, cc = st.columns(3)
-            ca.metric("Persistencia (prom. diario)", f"${prom_persist:.1f}/kWh")
+            ca.metric("Persistencia D-1 (prom. diario)", f"${prom_persist:.1f}/kWh")
             cb.metric("Lasso (prom. diario)", f"${prom_lasso:.1f}/kWh")
             cc.metric("Aprendizaje residual (prom.)", f"${prom_res:.1f}/kWh")
             _mae_lasso = round(lasso_metrics["MAE"], 1)
@@ -1998,6 +1998,23 @@ with tab_carga:
                 f"Lasso MAE = **{_mae_lasso} \\$/kWh** | Persistencia MAE = **{_mae_persist} \\$/kWh**. "
                 f"El precio real puede diferir del pronostico en ese margen aproximado."
             )
+            # -- D-7: columna añadida por el pipeline (fecha_base - 7) --
+            from datetime import timedelta as _td  # noqa: PLC0415
+            _d7_fecha = fecha_base_auto - _td(days=7)
+            _tiene_d7 = "d7" in pred_auto.columns and pred_auto["d7"].notna().any()
+            _d7_precios = pred_auto["d7"].tolist() if _tiene_d7 else []
+            ver_d7 = st.checkbox(
+                "Mostrar persistencia semanal D-7 (operable con rezago XM)",
+                value=False,
+                disabled=not _tiene_d7,
+                help=(
+                    f"Usa el precio del {_d7_fecha.strftime('%d %b %Y')} "
+                    "(hace 7 días) como pronóstico. "
+                    "Es la única línea base operable en tiempo real dado el rezago de XM. "
+                    "MAE histórico: ~163 $/kWh (frente a ~69 $/kWh de D-1)."
+                ),
+                key="chk_d7_auto",
+            )
             fig_auto = go.Figure()
             fig_auto.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
                                line_width=0, annotation_text="Franja pico",
@@ -2005,7 +2022,7 @@ with tab_carga:
             horas_auto = list(range(24))
             fig_auto.add_trace(go.Scatter(
                 x=horas_auto, y=pred_auto["persistencia"].tolist(),
-                mode="lines+markers", name="Persistencia",
+                mode="lines+markers", name="Persistencia D-1",
                 line=dict(color=AZUL, width=3), marker=dict(size=6)))
             fig_auto.add_trace(go.Scatter(
                 x=horas_auto, y=pred_auto["lasso"].tolist(),
@@ -2015,6 +2032,13 @@ with tab_carga:
                 x=horas_auto, y=pred_auto["residual"].tolist(),
                 mode="lines+markers", name="Aprendizaje residual",
                 line=dict(color=NARANJA, width=2), marker=dict(size=5)))
+            if ver_d7 and _d7_precios:
+                fig_auto.add_trace(go.Scatter(
+                    x=horas_auto, y=_d7_precios,
+                    mode="lines+markers", name=f"Persistencia D-7 ({_d7_fecha.strftime('%d %b')})",
+                    line=dict(color="#9333ea", width=2, dash="dot"), marker=dict(size=4),
+                    hovertemplate="D-7 — Hora %{x}h: $%{y:.1f}<extra></extra>",
+                ))
             fig_auto.update_layout(
                 xaxis_title="Hora del dia", yaxis_title="Precio ($/kWh)",
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
