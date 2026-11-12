@@ -2074,14 +2074,18 @@ with tab_carga:
         )
         with st.container(border=True):
             st.markdown(
-                f"**Pronóstico operable en tiempo real para "
-                f"{fecha_obj_auto.strftime('%d de %b de %Y')}**"
+                f"**Pronóstico del día siguiente al último dato disponible en XM "
+                f"({fecha_obj_auto.strftime('%d de %b de %Y')})**"
             )
             st.caption(
-                "Las estrategias D-7, Lasso y Aprendizaje residual no dependen del precio del "
-                "día anterior y pueden ejecutarse en tiempo real dado el rezago de publicación "
-                "de XM (3-4 días). La persistencia D-1 ofrece mejor precisión histórica "
-                "(MAE ~69 $/kWh) pero requiere el precio de ayer, que aún no está disponible."
+                "Las tres estrategias producen el pronóstico para la misma fecha, el día siguiente "
+                "al último dato publicado por XM (con 3-4 días de rezago respecto a hoy). "
+                "Se excluye la Persistencia D-1 porque requiere el precio del día anterior, "
+                "que aún no ha sido publicado. "
+                "La Persistencia D-7 es la única estrategia que no depende de features de ML "
+                "y podría extenderse al verdadero mañana con una fuente de datos sin rezago; "
+                "Lasso y Aprendizaje residual requieren las variables del día base (rezagos de "
+                "precio, embalse, ONI) sujetas al mismo rezago de XM."
             )
             fig_operable = go.Figure()
             fig_operable.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
