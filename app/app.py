@@ -2072,52 +2072,6 @@ with tab_carga:
             "(frente a ~69 $/kWh de D-1). Ver la gráfica 9 en la pestaña Desempeño del modelo.",
             icon="ℹ️",
         )
-        with st.container(border=True):
-            st.markdown(
-                f"**Pronóstico del día siguiente al último dato disponible en XM "
-                f"({fecha_obj_auto.strftime('%d de %b de %Y')})**"
-            )
-            st.caption(
-                "Las tres estrategias producen el pronóstico para la misma fecha, el día siguiente "
-                "al último dato publicado por XM (con 3-4 días de rezago respecto a hoy). "
-                "Se excluye la Persistencia D-1 porque requiere el precio del día anterior, "
-                "que aún no ha sido publicado. "
-                "La Persistencia D-7 es la única estrategia que no depende de features de ML "
-                "y podría extenderse al verdadero mañana con una fuente de datos sin rezago; "
-                "Lasso y Aprendizaje residual requieren las variables del día base (rezagos de "
-                "precio, embalse, ONI) sujetas al mismo rezago de XM."
-            )
-            fig_operable = go.Figure()
-            fig_operable.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
-                                   line_width=0, annotation_text="Franja pico",
-                                   annotation_position="top left")
-            if _tiene_d7 and _d7_precios:
-                fig_operable.add_trace(go.Scatter(
-                    x=horas_auto, y=_d7_precios,
-                    mode="lines+markers",
-                    name=f"Persistencia D-7 ({_d7_fecha.strftime('%d %b')})",
-                    line=dict(color="#9333ea", width=2, dash="dot"), marker=dict(size=4),
-                    hovertemplate="D-7 — Hora %{x}h: $%{y:.1f}<extra></extra>",
-                ))
-            fig_operable.add_trace(go.Scatter(
-                x=horas_auto, y=pred_auto["lasso"].tolist(),
-                mode="lines+markers", name="Lasso",
-                line=dict(color=VERDE, width=2), marker=dict(size=5),
-                hovertemplate="Lasso — Hora %{x}h: $%{y:.1f}<extra></extra>",
-            ))
-            fig_operable.add_trace(go.Scatter(
-                x=horas_auto, y=pred_auto["residual"].tolist(),
-                mode="lines+markers", name="Aprendizaje residual",
-                line=dict(color=NARANJA, width=2), marker=dict(size=5),
-                hovertemplate="Residual — Hora %{x}h: $%{y:.1f}<extra></extra>",
-            ))
-            fig_operable.update_layout(
-                xaxis_title="Hora del dia", yaxis_title="Precio ($/kWh)",
-                legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
-            )
-            fig_operable = estilo_grafico(fig_operable, PLANTILLA, 320)
-            fig_operable.update_layout(margin=dict(t=30, b=90))
-            st.plotly_chart(fig_operable, use_container_width=True)
         # --- D-7 para el verdadero mañana (hoy + 1) ---
         _tiene_d7_manana = (
             "d7_manana" in pred_auto.columns
