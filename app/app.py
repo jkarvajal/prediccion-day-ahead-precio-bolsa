@@ -2045,52 +2045,6 @@ with tab_carga:
             "(frente a ~69 $/kWh de D-1). Ver la gráfica 9 en la pestaña Desempeño del modelo.",
             icon="ℹ️",
         )
-        # --- D-7 para el verdadero mañana (hoy + 1) ---
-        _tiene_d7_manana = (
-            "d7_manana" in pred_auto.columns
-            and "fecha_obj_d7_manana" in pred_auto.columns
-            and pred_auto["d7_manana"].notna().any()
-        )
-        if _tiene_d7_manana:
-            import numpy as _np  # noqa: PLC0415
-            from datetime import timedelta as _td  # noqa: PLC0415
-            _fecha_d7m_obj = pd.to_datetime(
-                pred_auto["fecha_obj_d7_manana"].iloc[0]).date()
-            _d7m_ref = _fecha_d7m_obj - _td(days=7)
-            _d7m_precios = pred_auto["d7_manana"].tolist()
-            _d7m_prom = float(_np.nanmean(_d7m_precios))
-            with st.container(border=True):
-                st.markdown(
-                    f"**Predicción D-7 para mañana "
-                    f"({_fecha_d7m_obj.strftime('%d de %b de %Y')})**"
-                )
-                st.caption(
-                    f"Usa el precio del {_d7m_ref.strftime('%d %b %Y')} (hace 7 días) "
-                    "como pronóstico horario. "
-                    "Es la única estrategia del proyecto que puede predecir el verdadero "
-                    "día siguiente sin depender del rezago de publicación de XM (3-4 días). "
-                    "MAE histórico de la persistencia D-7: ~163 $/kWh."
-                )
-                st.metric("Precio promedio estimado para mañana", f"${_d7m_prom:.1f}/kWh")
-                fig_d7m = go.Figure()
-                fig_d7m.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
-                                  line_width=0, annotation_text="Franja pico",
-                                  annotation_position="top left")
-                fig_d7m.add_trace(go.Scatter(
-                    x=horas_auto, y=_d7m_precios,
-                    mode="lines+markers",
-                    name=f"D-7 ({_d7m_ref.strftime('%d %b')})",
-                    line=dict(color="#9333ea", width=2, dash="dot"), marker=dict(size=5),
-                    hovertemplate="D-7 — Hora %{x}h: $%{y:.1f}<extra></extra>",
-                ))
-                fig_d7m.update_layout(
-                    xaxis_title="Hora del dia", yaxis_title="Precio ($/kWh)",
-                    legend=dict(orientation="h", yanchor="top", y=-0.2,
-                                xanchor="center", x=0.5),
-                )
-                fig_d7m = estilo_grafico(fig_d7m, PLANTILLA, 280)
-                fig_d7m.update_layout(margin=dict(t=30, b=90))
-                st.plotly_chart(fig_d7m, use_container_width=True)
         st.divider()
 
     # --- Verificacion: pronostico frente al precio real observado ---
