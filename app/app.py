@@ -876,21 +876,30 @@ with tab_expl:
         )
         st.plotly_chart(estilo_grafico(fig_iqr, PLANTILLA, 420), use_container_width=True)
 
-        # --- 2. Rango completo (mín/máx reales) ---
-        st.markdown("**2. Rango completo: mínimo, máximo y cuartiles**")
-        st.caption("Bigotes = mínimo y máximo histórico real (sin recorte al 1.5×IQR).")
+        # --- 2. Rango completo (líneas máx/media/mín) ---
+        st.markdown("**2. Rango completo: mínimo, máximo y media**")
+        st.caption("Máximo, media y mínimo histórico del precio para cada hora del día.")
         fig_full = go.Figure()
-        for _, _r in _stats_h.iterrows():
-            fig_full.add_trace(go.Box(
-                x=[int(_r["hora"])], q1=[_r["q1"]], median=[_r["mediana"]],
-                q3=[_r["q3"]], lowerfence=[_r["minimo"]], upperfence=[_r["maximo"]],
-                name="", showlegend=False, whiskerwidth=0.6,
-                marker_color=AZUL, line_color=AZUL,
-                fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.25)",
-            ))
+        fig_full.add_trace(go.Scatter(
+            x=_horas, y=_stats_h["maximo"].tolist(), mode="lines+markers", name="Máximo",
+            line=dict(color=NARANJA, width=2, dash="dot"), marker=dict(size=5),
+            hovertemplate="Hora %{x}h — Máx: $%{y:.1f}<extra></extra>",
+        ))
+        fig_full.add_trace(go.Scatter(
+            x=_horas, y=_stats_h["media"].tolist(), mode="lines+markers", name="Media",
+            line=dict(color=AZUL, width=2.5), marker=dict(size=6),
+            hovertemplate="Hora %{x}h — Media: $%{y:.1f}<extra></extra>",
+        ))
+        fig_full.add_trace(go.Scatter(
+            x=_horas, y=_stats_h["minimo"].tolist(), mode="lines+markers", name="Mínimo",
+            line=dict(color=VERDE, width=2, dash="dot"), marker=dict(size=5),
+            hovertemplate="Hora %{x}h — Mín: $%{y:.1f}<extra></extra>",
+        ))
         fig_full.update_layout(
             xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
             yaxis_title="Precio de bolsa ($/kWh)",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
         )
         st.plotly_chart(estilo_grafico(fig_full, PLANTILLA, 420), use_container_width=True)
 
@@ -1294,22 +1303,30 @@ with tab_expl:
         )
         st.plotly_chart(estilo_grafico(fig_año_iqr, PLANTILLA, 420), use_container_width=True)
 
-        # --- 2. Rango completo por año (boxplot) ---
+        # --- 2. Rango completo por año (líneas máx/media/mín) ---
         st.markdown("**2. Rango completo por año**")
-        st.caption("Distribución anual del precio. Bigotes = mínimo y máximo histórico real.")
+        st.caption("Máximo, media y mínimo histórico del precio para cada año.")
         fig_año_box = go.Figure()
-        for _, _row in _stats_año.iterrows():
-            fig_año_box.add_trace(go.Box(
-                x=[int(_row["año"])],
-                q1=[_row["q1"]], median=[_row["mediana"]], q3=[_row["q3"]],
-                lowerfence=[_row["minimo"]], upperfence=[_row["maximo"]],
-                name="", showlegend=False, whiskerwidth=0.6,
-                marker_color=NARANJA, line_color=NARANJA,
-                fillcolor=f"rgba({_narj_r},{_narj_g},{_narj_b},0.25)",
-            ))
+        fig_año_box.add_trace(go.Scatter(
+            x=_años_ord, y=_stats_año["maximo"].tolist(), mode="lines+markers", name="Máximo",
+            line=dict(color=NARANJA, width=2, dash="dot"), marker=dict(size=5),
+            hovertemplate="Año %{x} — Máx: $%{y:.1f}<extra></extra>",
+        ))
+        fig_año_box.add_trace(go.Scatter(
+            x=_años_ord, y=_stats_año["media"].tolist(), mode="lines+markers", name="Media",
+            line=dict(color=AZUL, width=2.5), marker=dict(size=6),
+            hovertemplate="Año %{x} — Media: $%{y:.1f}<extra></extra>",
+        ))
+        fig_año_box.add_trace(go.Scatter(
+            x=_años_ord, y=_stats_año["minimo"].tolist(), mode="lines+markers", name="Mínimo",
+            line=dict(color=VERDE, width=2, dash="dot"), marker=dict(size=5),
+            hovertemplate="Año %{x} — Mín: $%{y:.1f}<extra></extra>",
+        ))
         fig_año_box.update_layout(
             xaxis=dict(title="Año", tickmode="linear", dtick=1),
             yaxis_title="Precio de bolsa ($/kWh)",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
         )
         st.plotly_chart(estilo_grafico(fig_año_box, PLANTILLA, 420), use_container_width=True)
 
