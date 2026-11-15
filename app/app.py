@@ -1007,50 +1007,30 @@ with tab_expl:
 
             # --- 2. Rango completo por tipo de día (barras agrupadas) ---
             st.markdown("**2. Rango completo por tipo de día**")
-            st.caption("Mínimo, promedio y máximo histórico del precio para cada tipo de jornada.")
+            st.caption("Mínimo, mediana, promedio y máximo histórico del precio para cada tipo de jornada.")
+            _td_tipos_x = _stats_tipo["Tipo de día"].tolist()
             fig_td_box = go.Figure()
-            fig_td_box.add_trace(go.Bar(
-                x=_stats_tipo["Tipo de día"], y=_stats_tipo["minimo"],
-                name="Mínimo", marker_color=VERDE, opacity=0.85,
-                hovertemplate="%{x} — Mín: $%{y:.1f}<extra></extra>",
-            ))
-            fig_td_box.add_trace(go.Bar(
-                x=_stats_tipo["Tipo de día"], y=_stats_tipo["media"],
-                name="Promedio", marker_color=AZUL, opacity=0.85,
-                hovertemplate="%{x} — Prom: $%{y:.1f}<extra></extra>",
-            ))
-            fig_td_box.add_trace(go.Bar(
-                x=_stats_tipo["Tipo de día"], y=_stats_tipo["maximo"],
-                name="Máximo", marker_color=NARANJA, opacity=0.85,
-                hovertemplate="%{x} — Máx: $%{y:.1f}<extra></extra>",
-            ))
+            for _nombre, _vals, _color in [
+                ("Mínimo",  _stats_tipo["minimo"].tolist(),  VERDE),
+                ("Mediana", _stats_tipo["mediana"].tolist(), "#6b3fa0"),
+                ("Promedio",_stats_tipo["media"].tolist(),   AZUL),
+                ("Máximo",  _stats_tipo["maximo"].tolist(),  NARANJA),
+            ]:
+                fig_td_box.add_trace(go.Bar(
+                    x=_td_tipos_x, y=_vals,
+                    name=_nombre, marker_color=_color, opacity=0.85,
+                    text=[f"${v:.0f}" for v in _vals],
+                    textposition="outside",
+                    textfont=dict(size=10),
+                    hovertemplate=f"%{{x}} — {_nombre}: $%{{y:.1f}}<extra></extra>",
+                ))
             fig_td_box.update_layout(
                 barmode="group",
                 xaxis_title="Tipo de día", yaxis_title="Precio de bolsa ($/kWh)",
                 legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+                uniformtext=dict(mode="hide", minsize=8),
             )
-            st.plotly_chart(estilo_grafico(fig_td_box, PLANTILLA, 420), use_container_width=True)
-
-            # --- 4. Media y mediana por tipo de día (barras) ---
-            st.markdown("**4. Media y mediana por tipo de día**")
-            st.caption("Comparación directa entre la media aritmética (sensible a extremos) y la mediana (valor central).")
-            fig_td_bar = go.Figure()
-            fig_td_bar.add_trace(go.Bar(
-                x=_stats_tipo["Tipo de día"], y=_stats_tipo["media"],
-                name="Media", marker_color=AZUL, opacity=0.85,
-                hovertemplate="%{x} — Media: $%{y:.1f}<extra></extra>",
-            ))
-            fig_td_bar.add_trace(go.Bar(
-                x=_stats_tipo["Tipo de día"], y=_stats_tipo["mediana"],
-                name="Mediana", marker_color=VERDE, opacity=0.85,
-                hovertemplate="%{x} — Mediana: $%{y:.1f}<extra></extra>",
-            ))
-            fig_td_bar.update_layout(
-                barmode="group",
-                xaxis_title="Tipo de día", yaxis_title="Precio de bolsa ($/kWh)",
-                legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
-            )
-            st.plotly_chart(estilo_grafico(fig_td_bar, PLANTILLA, 400), use_container_width=True)
+            st.plotly_chart(estilo_grafico(fig_td_box, PLANTILLA, 440), use_container_width=True)
 
             # --- 5. Perfil horario por tipo de día ---
             st.markdown("**5. Perfil horario por tipo de día (mediana)**")
