@@ -1939,44 +1939,6 @@ with tab_clima:
                        "suelen reducir las precipitaciones y con ello el nivel de embalses. "
                        "La línea punteada marca ONI = 0 (frontera El Niño / La Niña).")
 
-        def grafico_dispersion(x_col, x_titulo, color):
-            """Dispersión de la exógena frente al precio sobre todo el histórico, con línea
-            de tendencia (mínimos cuadrados) y el coeficiente de correlación."""
-            d = clima[[x_col, "precio_promedio"]].dropna()  # histórico completo, no filtrado
-            if len(d) < 3:
-                return None, None
-            x, y = d[x_col].to_numpy(float), d["precio_promedio"].to_numpy(float)
-            m, b = np.polyfit(x, y, 1)
-            xs = np.array([x.min(), x.max()])
-            r = float(np.corrcoef(x, y)[0, 1])
-            f = go.Figure()
-            f.add_trace(go.Scatter(x=x, y=y, mode="markers", name="Días",
-                                   marker=dict(color=color, size=5, opacity=0.35)))
-            f.add_trace(go.Scatter(x=xs, y=m * xs + b, mode="lines", name="Tendencia",
-                                   line=dict(color=COLOR_REAL, width=2, dash="dash")))
-            f.update_layout(xaxis_title=x_titulo, yaxis_title="Precio de bolsa ($/kWh)",
-                            legend=leyenda)
-            return estilo_grafico(f, PLANTILLA, 360), r
-
-        st.markdown("**Asociación directa (todo el histórico)**")
-        st.caption("Cada punto es un día (serie completa, sin el filtro de periodo). La "
-                   "línea de tendencia resume la relación: su pendiente indica si el precio "
-                   "sube o baja con la variable.")
-        d1, d2 = st.columns(2)
-        if "oni" in clima.columns:
-            fig_s1, r1 = grafico_dispersion("oni", "Índice ONI (El Niño)", NARANJA)
-            if fig_s1 is not None:
-                d1.plotly_chart(fig_s1, use_container_width=True)
-                rel1 = "a mayor El Niño, mayor precio" if r1 >= 0 else "relación inversa"
-                d1.caption(f"Precio vs. ONI. Correlación r = {r1:.2f} ({rel1}).")
-        if "embalse_porcentaje_diario" in clima.columns:
-            fig_s2, r2 = grafico_dispersion("embalse_porcentaje_diario",
-                                            "Nivel de embalses (%)", VERDE)
-            if fig_s2 is not None:
-                d2.plotly_chart(fig_s2, use_container_width=True)
-                rel2 = "a menor nivel, mayor precio" if r2 <= 0 else "relación directa"
-                d2.caption(f"Precio vs. embalses. Correlación r = {r2:.2f} ({rel2}).")
-
 # ======================================================================== #
 # Vista 6: pronóstico con datos cargados por el usuario
 # ======================================================================== #
