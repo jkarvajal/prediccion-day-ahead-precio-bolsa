@@ -903,45 +903,6 @@ with tab_expl:
         )
         st.plotly_chart(estilo_grafico(fig_full, PLANTILLA, 420), use_container_width=True)
 
-        # --- 4. Percentiles múltiples (P10 a P90) ---
-        st.markdown("**4. Percentiles múltiples (P10, P25, P50, P75, P90)**")
-        st.caption("Cinco umbrales de precio: el área entre P10 y P90 contiene el 80 % de las observaciones.")
-        _pcts = (
-            larga_agg.groupby("hora")["precio"]
-            .quantile([0.10, 0.25, 0.50, 0.75, 0.90])
-            .unstack(level=1)
-        )
-        _pcts.columns = ["P10", "P25", "P50", "P75", "P90"]
-        _pcts = _pcts.reset_index()
-        _pct_horas = _pcts["hora"].tolist()
-        _colores_pct = [AZUL, VERDE, NARANJA, VERDE, AZUL]
-        _dash_pct    = ["dash", "dot", "solid", "dot", "dash"]
-        _width_pct   = [1.2, 1.5, 2.5, 1.5, 1.2]
-        fig_pct = go.Figure()
-        fig_pct.add_trace(go.Scatter(
-            x=_pct_horas + _pct_horas[::-1],
-            y=_pcts["P90"].tolist() + _pcts["P10"].tolist()[::-1],
-            fill="toself", fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.08)",
-            line=dict(width=0), name="Banda P10-P90", hoverinfo="skip",
-        ))
-        for _col, _c, _d, _w in zip(
-            ["P10", "P25", "P50", "P75", "P90"],
-            _colores_pct, _dash_pct, _width_pct
-        ):
-            fig_pct.add_trace(go.Scatter(
-                x=_pct_horas, y=_pcts[_col].tolist(),
-                mode="lines", line=dict(color=_c, width=_w, dash=_d),
-                name=_col,
-                hovertemplate=f"Hora %{{x}}h — {_col}: $%{{y:.1f}}<extra></extra>",
-            ))
-        fig_pct.update_layout(
-            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
-            yaxis_title="Precio de bolsa ($/kWh)",
-            legend=dict(orientation="v", yanchor="bottom", y=0, xanchor="right", x=1),
-            hovermode="x unified",
-        )
-        st.plotly_chart(estilo_grafico(fig_pct, PLANTILLA, 420), use_container_width=True)
-
         # --- 7. Histograma de precio por hora ---
         st.markdown("**7. Histograma de frecuencias por hora**")
         st.caption("Distribución de precios para cada hora del día. Las barras muestran con qué frecuencia el precio cayó en cada rango.")
