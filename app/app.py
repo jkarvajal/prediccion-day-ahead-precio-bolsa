@@ -894,17 +894,6 @@ with tab_expl:
         )
         st.plotly_chart(estilo_grafico(fig_full, PLANTILLA, 420), use_container_width=True)
 
-        # --- 3. Violín ---
-        st.markdown("**3. Distribución por densidad (violín)**")
-        st.caption("La forma del violín revela cómo se concentra el precio en cada hora; más ancho = más frecuente.")
-        fig_vio = px.violin(
-            larga, x="hora", y="precio", points=False,
-            labels={"hora": "Hora del día", "precio": "Precio de bolsa ($/kWh)"},
-            color_discrete_sequence=[AZUL],
-        )
-        fig_vio.update_traces(meanline_visible=True)
-        st.plotly_chart(estilo_grafico(fig_vio, PLANTILLA, 420), use_container_width=True)
-
         # --- 4. Percentiles múltiples (P10 a P90) ---
         st.markdown("**4. Percentiles múltiples (P10, P25, P50, P75, P90)**")
         st.caption("Cinco umbrales de precio: el área entre P10 y P90 contiene el 80 % de las observaciones.")
@@ -943,54 +932,6 @@ with tab_expl:
             hovermode="x unified",
         )
         st.plotly_chart(estilo_grafico(fig_pct, PLANTILLA, 420), use_container_width=True)
-
-        # --- 5. Mapa de calor hora × mes ---
-        st.markdown("**5. Mapa de calor: precio promedio por hora y mes**")
-        st.caption("Cada celda es el precio medio para esa combinación de hora del día y mes del año.")
-        _heat = (
-            larga_agg.groupby(["hora", "mes"])["precio"]
-            .mean()
-            .reset_index()
-        )
-        _pivot_hm = _heat.pivot(index="hora", columns="mes", values="precio")
-        _meses_abrev = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
-                        7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
-        _pivot_hm.columns = [_meses_abrev.get(c, str(c)) for c in _pivot_hm.columns]
-        fig_heat = px.imshow(
-            _pivot_hm,
-            labels=dict(x="Mes", y="Hora del día", color="$/kWh"),
-            color_continuous_scale="Blues",
-            aspect="auto",
-        )
-        fig_heat.update_yaxes(tickmode="linear", dtick=2)
-        st.plotly_chart(estilo_grafico(fig_heat, PLANTILLA, 420), use_container_width=True)
-
-        # --- 6. Media ± desviación estándar ---
-        st.markdown("**6. Media y desviación estándar**")
-        st.caption("La línea central es el precio medio; la banda sombreada abarca ±1 desviación estándar (~68 % de los datos).")
-        _media = _stats_h["media"].tolist()
-        _std   = _stats_h["std"].tolist()
-        _sup   = [m + s for m, s in zip(_media, _std)]
-        _inf   = [max(0, m - s) for m, s in zip(_media, _std)]
-        fig_std = go.Figure()
-        fig_std.add_trace(go.Scatter(
-            x=_horas + _horas[::-1], y=_sup + _inf[::-1],
-            fill="toself", fillcolor=f"rgba({_narj_r},{_narj_g},{_narj_b},0.15)",
-            line=dict(width=0), name="±1 Desv. est.", hoverinfo="skip",
-        ))
-        fig_std.add_trace(go.Scatter(
-            x=_horas, y=_media, mode="lines+markers",
-            line=dict(color=NARANJA, width=2.5), marker=dict(size=5),
-            name="Media",
-            hovertemplate="Hora %{x}h — Media: $%{y:.1f}<extra></extra>",
-        ))
-        fig_std.update_layout(
-            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
-            yaxis_title="Precio de bolsa ($/kWh)",
-            legend=dict(orientation="v", yanchor="bottom", y=0, xanchor="right", x=1),
-            hovermode="x unified",
-        )
-        st.plotly_chart(estilo_grafico(fig_std, PLANTILLA, 420), use_container_width=True)
 
         # --- 7. Histograma de precio por hora ---
         st.markdown("**7. Histograma de frecuencias por hora**")
@@ -1111,24 +1052,6 @@ with tab_expl:
                 ))
             fig_td_box.update_layout(xaxis_title="Tipo de día", yaxis_title="Precio de bolsa ($/kWh)")
             st.plotly_chart(estilo_grafico(fig_td_box, PLANTILLA, 420), use_container_width=True)
-
-            # --- 3. Violín por tipo de día ---
-            st.markdown("**3. Distribución por densidad (violín)**")
-            st.caption("Muestra la forma completa de la distribución del precio para cada tipo de día.")
-            _larga_tipo = larga[larga["FECHA"].isin(larga_agg["FECHA"])].copy() if "FECHA" in larga.columns else larga.copy()
-            _larga_tipo["Tipo de día"] = _larga_tipo["base_tipo_dia"].map(TIPO_DIA_ES).fillna(_larga_tipo["base_tipo_dia"]) if "base_tipo_dia" in _larga_tipo.columns else None
-            if _larga_tipo["Tipo de día"].notna().any():
-                _larga_tipo = _larga_tipo[_larga_tipo["Tipo de día"].isin(_tipos_pres)].copy()
-                _larga_tipo["Tipo de día"] = pd.Categorical(_larga_tipo["Tipo de día"], categories=_tipos_pres, ordered=True)
-                fig_td_vio = px.violin(
-                    _larga_tipo.sort_values("Tipo de día"), x="Tipo de día", y="precio", points=False,
-                    color="Tipo de día", color_discrete_map=_colores_tipo,
-                    labels={"precio": "Precio de bolsa ($/kWh)"},
-                    category_orders={"Tipo de día": _tipos_pres},
-                )
-                fig_td_vio.update_traces(meanline_visible=True)
-                fig_td_vio.update_layout(showlegend=False)
-                st.plotly_chart(estilo_grafico(fig_td_vio, PLANTILLA, 420), use_container_width=True)
 
             # --- 4. Media y mediana por tipo de día (barras) ---
             st.markdown("**4. Media y mediana por tipo de día**")
