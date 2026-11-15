@@ -1157,25 +1157,36 @@ with tab_expl:
         )
         st.plotly_chart(estilo_grafico(fig_mes_iqr, PLANTILLA, 420), use_container_width=True)
 
-        # --- 2. Rango completo por mes (boxplot) ---
+        # --- 2. Rango completo por mes (líneas máx/media/mín) ---
         st.markdown("**2. Rango completo por mes**")
-        st.caption("Distribución del precio para cada mes. Bigotes = mínimo y máximo histórico real.")
-        fig_mes_box = go.Figure()
-        for _, _row in _stats_mes.iterrows():
-            fig_mes_box.add_trace(go.Box(
-                x=[_row["mes_nombre"]],
-                q1=[_row["q1"]], median=[_row["mediana"]], q3=[_row["q3"]],
-                lowerfence=[_row["minimo"]], upperfence=[_row["maximo"]],
-                name="", showlegend=False, whiskerwidth=0.6,
-                marker_color=AZUL, line_color=AZUL,
-                fillcolor=f"rgba({_azul_r},{_azul_g},{_azul_b},0.25)",
-            ))
-        fig_mes_box.update_layout(
-            xaxis=dict(title="Mes", categoryorder="array",
-                       categoryarray=list(_meses_nombre.values())),
+        st.caption("Máximo, media y mínimo histórico del precio para cada mes del año.")
+        _sm_max  = _sm["maximo"].tolist()
+        _sm_mean = _sm["media"].tolist()
+        _sm_min  = _sm["minimo"].tolist()
+        _sm_meses = _sm["mes_nombre"].tolist()
+        fig_mes_rng = go.Figure()
+        fig_mes_rng.add_trace(go.Scatter(
+            x=_sm_meses, y=_sm_max, mode="lines+markers", name="Máximo",
+            line=dict(color=NARANJA, width=2, dash="dot"), marker=dict(size=5),
+            hovertemplate="%{x} — Máx: $%{y:.1f}<extra></extra>",
+        ))
+        fig_mes_rng.add_trace(go.Scatter(
+            x=_sm_meses, y=_sm_mean, mode="lines+markers", name="Media",
+            line=dict(color=AZUL, width=2.5), marker=dict(size=6),
+            hovertemplate="%{x} — Media: $%{y:.1f}<extra></extra>",
+        ))
+        fig_mes_rng.add_trace(go.Scatter(
+            x=_sm_meses, y=_sm_min, mode="lines+markers", name="Mínimo",
+            line=dict(color=VERDE, width=2, dash="dot"), marker=dict(size=5),
+            hovertemplate="%{x} — Mín: $%{y:.1f}<extra></extra>",
+        ))
+        fig_mes_rng.update_layout(
+            xaxis_title="Mes",
             yaxis_title="Precio de bolsa ($/kWh)",
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            hovermode="x unified",
         )
-        st.plotly_chart(estilo_grafico(fig_mes_box, PLANTILLA, 420), use_container_width=True)
+        st.plotly_chart(estilo_grafico(fig_mes_rng, PLANTILLA, 420), use_container_width=True)
 
         # --- 3. Mapa de calor mes × hora ---
         st.markdown("**3. Mapa de calor: precio promedio por mes y hora**")
