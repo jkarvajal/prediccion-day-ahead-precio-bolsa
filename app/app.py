@@ -1044,22 +1044,30 @@ with tab_expl:
             )
             st.plotly_chart(estilo_grafico(fig_td_iqr, PLANTILLA, 420), use_container_width=True)
 
-            # --- 2. Rango completo (boxplot) ---
+            # --- 2. Rango completo por tipo de día (barras agrupadas) ---
             st.markdown("**2. Rango completo por tipo de día**")
-            st.caption("Bigotes = mínimo y máximo histórico real. La caja abarca Q1–Q3 y la línea interior es la mediana.")
+            st.caption("Mínimo, promedio y máximo histórico del precio para cada tipo de jornada.")
             fig_td_box = go.Figure()
-            for _, _row in _stats_tipo.iterrows():
-                _c = _colores_tipo.get(_row["Tipo de día"], AZUL)
-                _r, _g, _b = int(_c[1:3], 16), int(_c[3:5], 16), int(_c[5:7], 16)
-                fig_td_box.add_trace(go.Box(
-                    x=[_row["Tipo de día"]],
-                    q1=[_row["q1"]], median=[_row["mediana"]], q3=[_row["q3"]],
-                    lowerfence=[_row["minimo"]], upperfence=[_row["maximo"]],
-                    name=_row["Tipo de día"], showlegend=False, whiskerwidth=0.6,
-                    marker_color=_c, line_color=_c,
-                    fillcolor=f"rgba({_r},{_g},{_b},0.25)",
-                ))
-            fig_td_box.update_layout(xaxis_title="Tipo de día", yaxis_title="Precio de bolsa ($/kWh)")
+            fig_td_box.add_trace(go.Bar(
+                x=_stats_tipo["Tipo de día"], y=_stats_tipo["minimo"],
+                name="Mínimo", marker_color=VERDE, opacity=0.85,
+                hovertemplate="%{x} — Mín: $%{y:.1f}<extra></extra>",
+            ))
+            fig_td_box.add_trace(go.Bar(
+                x=_stats_tipo["Tipo de día"], y=_stats_tipo["media"],
+                name="Promedio", marker_color=AZUL, opacity=0.85,
+                hovertemplate="%{x} — Prom: $%{y:.1f}<extra></extra>",
+            ))
+            fig_td_box.add_trace(go.Bar(
+                x=_stats_tipo["Tipo de día"], y=_stats_tipo["maximo"],
+                name="Máximo", marker_color=NARANJA, opacity=0.85,
+                hovertemplate="%{x} — Máx: $%{y:.1f}<extra></extra>",
+            ))
+            fig_td_box.update_layout(
+                barmode="group",
+                xaxis_title="Tipo de día", yaxis_title="Precio de bolsa ($/kWh)",
+                legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5),
+            )
             st.plotly_chart(estilo_grafico(fig_td_box, PLANTILLA, 420), use_container_width=True)
 
             # --- 4. Media y mediana por tipo de día (barras) ---
