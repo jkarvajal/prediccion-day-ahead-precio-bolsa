@@ -48,7 +48,7 @@ DIEBOLD_MARIANO_PATH = OUTPUTS_DIR / "consolidado_diebold_mariano.csv"
 PREDICCION_AUTO_PATH = OUTPUTS_DIR / "prediccion_automatica.csv"
 PREDICCION_VERIF_PATH = OUTPUTS_DIR / "prediccion_verificacion.csv"
 
-PEAK_HOURS = [18, 19, 20, 21, 22]
+PEAK_HOURS = [18, 19, 20, 21]
 TARGET_COLS = [f"target_h{h:02d}" for h in range(24)]
 HOUR_COLS = [f"h{h:02d}" for h in range(24)]
 ML_MODEL_LABEL = "Lasso_horario_con_exogenas"
@@ -635,11 +635,11 @@ with tab_pred:
         st.markdown(f"**Día pronosticado:** {fecha_larga_es(fecha_objetivo)}")
         c1, c2, c3 = st.columns(3)
         c1.metric("Precio promedio", f"${promedio:.1f}")
-        c2.metric("Promedio en horas pico (18-22 h)", f"${pico:.1f}")
+        c2.metric("Promedio en horas pico (18-21 h)", f"${pico:.1f}")
         c3.metric("Hora más cara", f"{hora_max:02d}:00 (${pred_persist[hora_max]:.0f})")
 
         fig = go.Figure()
-        fig.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08, line_width=0,
+        fig.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.08, line_width=0,
                       annotation_text="Franja pico", annotation_position="top left")
         # Banda de incertidumbre conformal del modelo seleccionado (detrás de las líneas).
         if ver_banda and not intervalos.empty:
@@ -1385,7 +1385,7 @@ with tab_desemp:
                 name=_mod, line=dict(color=_col, width=2.5), marker=dict(size=5),
                 hovertemplate=f"{_mod} — Hora %{{x}}h: $%{{y:.1f}}<extra></extra>",
             ))
-        fig_eph.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+        fig_eph.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.07,
                           line_width=0, annotation_text="Franja pico",
                           annotation_position="top left")
         fig_eph.update_layout(
@@ -1396,7 +1396,7 @@ with tab_desemp:
         )
         st.plotly_chart(estilo_grafico(fig_eph, PLANTILLA, 420), use_container_width=True)
         st.caption("El error crece en las horas de tarde y noche (mayor precio y volatilidad). "
-                   "La franja rosada marca las horas de mayor demanda (18-22 h).")
+                   "La franja rosada marca las horas de mayor demanda (18-21 h).")
 
     # ------------------------------------------------------------------ #
     # 2. Reducción de error relativa frente a persistencia
@@ -1416,7 +1416,7 @@ with tab_desemp:
             showlegend=False,
         ))
         fig_mej.add_hline(y=0, line_dash="dot", line_color="gray", line_width=1)
-        fig_mej.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+        fig_mej.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.07,
                           line_width=0, annotation_text="Franja pico",
                           annotation_position="top left")
         fig_mej.update_layout(
@@ -1447,7 +1447,7 @@ with tab_desemp:
         ))
         fig_r2.add_hline(y=0, line_dash="dot", line_color="gray", line_width=1,
                          annotation_text="R²=0", annotation_position="right")
-        fig_r2.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+        fig_r2.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.07,
                          line_width=0, annotation_text="Franja pico",
                          annotation_position="top left")
         fig_r2.update_layout(
@@ -1495,7 +1495,7 @@ with tab_desemp:
             line=dict(color=NARANJA, width=1.5, dash="dot"), name="q_low (límite inferior)",
             hovertemplate="Hora %{x}h — q_low: $%{y:.1f}<extra></extra>",
         ))
-        fig_intv.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+        fig_intv.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.07,
                            line_width=0, annotation_text="Franja pico",
                            annotation_position="top left")
         fig_intv.update_layout(
@@ -1599,7 +1599,7 @@ with tab_desemp:
             name="Lasso", line=dict(color=_col_lasso, width=2.5), marker=dict(size=5),
             hovertemplate="Lasso — Hora %{x}h: %{y:.1f}%<extra></extra>",
         ))
-        fig_smape.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+        fig_smape.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.07,
                             line_width=0, annotation_text="Franja pico",
                             annotation_position="top left")
         fig_smape.update_layout(
@@ -1748,7 +1748,7 @@ with tab_desemp:
             line=dict(color=NARANJA, width=2.5), marker=dict(size=5),
             hovertemplate="D-7 — Hora %{x}h: $%{y:.1f}<extra></extra>",
         ))
-        fig_rezago.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.07,
+        fig_rezago.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.07,
                              line_width=0, annotation_text="Franja pico",
                              annotation_position="top left")
         fig_rezago.update_layout(
@@ -1876,7 +1876,7 @@ with tab_carga:
                 f"El precio real puede diferir del pronostico en ese margen aproximado."
             )
             fig_auto = go.Figure()
-            fig_auto.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
+            fig_auto.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.08,
                                line_width=0, annotation_text="Franja pico",
                                annotation_position="top left")
             horas_auto = list(range(24))
@@ -1936,7 +1936,7 @@ with tab_carga:
             mv2.metric("Error Lasso (MAE)", f"${_mae_v('lasso'):.1f}/kWh")
             mv3.metric("Error Ap. residual (MAE)", f"${_mae_v('residual'):.1f}/kWh")
             fig_v = go.Figure()
-            fig_v.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
+            fig_v.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.08,
                             line_width=0, annotation_text="Franja pico",
                             annotation_position="top left")
             fig_v.add_trace(go.Scatter(x=horas_v, y=verif["persistencia"].tolist(),
@@ -2021,7 +2021,7 @@ with tab_carga:
                             else [np.nan] * 24)
 
                 figc = go.Figure()
-                figc.add_vrect(x0=17.5, x1=22.5, fillcolor="crimson", opacity=0.08,
+                figc.add_vrect(x0=17.5, x1=21.5, fillcolor="crimson", opacity=0.08,
                                line_width=0, annotation_text="Franja pico",
                                annotation_position="top left")
                 figc.add_trace(go.Scatter(x=list(range(24)), y=pred_persist_c,
